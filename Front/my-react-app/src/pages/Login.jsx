@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { loginUser } from "../services/api";
 
+// Login component with role selection and improved UI
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("student");
+  const [role, setRole] = useState("STUDENT");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -48,63 +50,67 @@ function Login() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("http://127.0.0.1:8000/login/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, role }), //  role added
-      });
-      const res = await response.json();
-      console.log("Login response:", res); //  debug log
-      if (!response.ok) setError(res.message || "Login failed");
-    } catch (err) {
-      setError("Something went wrong. Try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+      const res = await loginUser({ email, password, role });
+      console.log("Backend response:", res);
+      alert("Login response: " + JSON.stringify(res));
+      // Handle successful login (e.g., store token, redirect)
+      if (res.token) {
+        localStorage.setItem("token", res.token);
+        localStorage.setItem("role", res.role);
+        // Redirect to dashboard or home page
+        
 
-  return (
-    <div style={containerStyle}>
-      <div style={boxStyle}>
-        <h2 style={{ textAlign: "center", color: "#2c3e50" }}>ILES System</h2>
-        <p style={{ textAlign: "center", color: "#888" }}>Sign in to your account</p>
-        {error && <p style={{ color: "red", textAlign: "center" }}>{error}</p>}
-        
-        <input
-          type="email"
-          placeholder="Email"
-          onChange={(e) => setEmail(e.target.value)}
-          style={inputStyle}
-        />
-        
-        <input
-          type="password"
-          placeholder="Password"
-          onChange={(e) => setPassword(e.target.value)}
-          style={inputStyle}
-        />
-        
-        <select
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-          style={inputStyle}
-        >
-          <option value="student">Student</option>
-          <option value="workplace_supervisor">Workplace Supervisor</option>
-          <option value="academic_supervisor">Academic Supervisor</option>
-          <option value="admin">Admin</option>
-        </select>
-        
-        <button
-          onClick={handleLogin}
-          disabled={loading}
-          style={buttonStyle}
-        >
-          {loading ? "Logging in..." : "Login"}
-        </button>
+      } 
+    }catch (err) {
+        setError("Something went wrong. Try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    return (
+      <div style={containerStyle}>
+        <div style={boxStyle}>
+          <h2 style={{ textAlign: "center", color: "#2c3e50" }}>ILES System</h2>
+          <p style={{ textAlign: "center", color: "#888" }}>Sign in to your account</p>
+          {error && <p style={{ color: "red", textAlign: "center" }}>{error}</p>}
+
+          <input
+            type="email"
+            placeholder="Email"
+            onChange={(e) => setEmail(e.target.value)}
+            style={inputStyle}
+          />
+
+          <input
+            type="password"
+            placeholder="Password"
+            onChange={(e) => setPassword(e.target.value)}
+            style={inputStyle}
+          />
+
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            style={inputStyle}
+          >
+
+            <option value="STUDENT">Student</option>
+            <option value="WORKPLACE_SUPERVISOR">Workplace Supervisor</option>
+            <option value="ACADEMIC_SUPERVISOR">Academic Supervisor</option>
+            <option value="INTERNSHIP_ADMIN">Internship Admin</option>
+          </select>
+
+          <button
+            onClick={handleLogin}
+            disabled={loading}
+            style={buttonStyle}
+          >
+            {loading ? "Logging in..." : "Login"}
+          </button>
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
-export default Login;
+  export default Login;
