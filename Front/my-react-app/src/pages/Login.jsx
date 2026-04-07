@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom"; // Used to redirect user after login
+import { useNavigate } from "react-router-dom";
 import { loginUser, saveToken, saveUser } from "../services/api";
-import { loginUser } from "../services/api";
 
 // Login component with role selection and improved UI
 function Login() {
