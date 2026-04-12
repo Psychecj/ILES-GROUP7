@@ -68,6 +68,13 @@ export async function registerUser({ username, email, password, confirmPassword,
   });
 }
 
+export async function forgotPassword({ email, new_password, confirm_password }) {
+  return apiFetch("/forgot-password/", {
+    method: "POST",
+    body: JSON.stringify({ email, new_password, confirm_password }),
+  });
+}   //now this is the forgot password function that accepts email, new password and confirm password and sends it to the backend to handle the password reset process. Merge conflicts are real...i had not placed this function in real time .
+
 //now the plcements
 export const getPlacements = () => apiFetch('/placements/');
 export const getPlacement = (id) => apiFetch(`/placements/${id}/`);
