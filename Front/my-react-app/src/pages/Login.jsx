@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState } from "react"; // We are calling react hook (useState) to remember our user Input which is triggered by onChange event in the input field.
 import { useNavigate } from "react-router-dom";
 import { loginUser, saveToken, saveUser } from "../services/api";
 import "./Login.css"; // Importing CSS for styling 
@@ -7,18 +7,18 @@ import "./Login.css"; // Importing CSS for styling
 
 
   //these are the state variables to store user input and ui status
-function Login() {
-  const [email, setEmail] = useState("");        //stores email
-  const [password, setPassword] = useState("");  // stores password
-  const [role, setRole] = useState("student");   //default role is student
-  const [loading, setLoading] = useState(false); //shos loading state
-  const [error, setError] = useState("");        //stores error messages
+function Login() {                               // component (login)
+  const [email, setEmail] = useState("");        // State variable to store email,with email as a variable and setEmail as a function to update it,initially empty string
+  const [password, setPassword] = useState("");  // State variable to store password
+  const [role, setRole] = useState("student");   // State variable to store role with default value "student"
+  const [loading, setLoading] = useState(false); // State variable to show loading state
+  const [error, setError] = useState("");        // State variable to store error messages
 
 
   const navigate = useNavigate(); //usedfor page navigation
 
 
- //this is a function that runs when user clicks login
+ //this is a function that runs when user clicks login and its the one that send data to backend and handles the response
   const handleLogin = async () => {
     setLoading(true);   //show loading state
     setError("");       //clears previous errors
@@ -76,12 +76,14 @@ function Login() {
         {/*the email input */}
         <input
           className = "input-field"
-          type="email"
+          type="text"
           value={email}
           placeholder="Email"
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => setEmail(e.target.value)} //e is an event object that reports what happens earlier in the input field, we use e.target.value to get the current value of the input and update the email state variable with setEmail function
           
-        />
+        /> 
+
+        <p>You are typing: {email}</p> 
         
         {/* the Password input */}
         <input 
@@ -90,8 +92,8 @@ function Login() {
           placeholder="Password"
           value ={password}
           onChange={(e) => setPassword(e.target.value)}
-          
         />
+        
         
         {/*the role selection dropdown */}
         <select
