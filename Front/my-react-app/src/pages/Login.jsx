@@ -40,8 +40,8 @@ function Login() {
   // defines where each role should be redirected
       const roleRoutes = {
        STUDENT: '/student',
-       WORKPLACE_SUPERVISOR: '/supervisor',
-       ACADEMIC_SUPERVISOR: '/academic',
+       WORKPLACE_SUPERVISOR: '/workplace-supervisor',
+       ACADEMIC_SUPERVISOR: '/academic-supervisor',
        INTERNSHIP_ADMIN: '/admin',
 };     
 
@@ -99,10 +99,10 @@ function Login() {
           onChange={(e) => setRole(e.target.value)}
           className = "input-field"
         >
-          <option value="student">Student</option>
-          <option value="workplace_supervisor">Workplace Supervisor</option>
-          <option value="academic_supervisor">Academic Supervisor</option>
-          <option value="admin">Admin</option>
+          <option value="STUDENT">Student</option>
+          <option value="WORKPLACE_SUPERVISOR">Workplace Supervisor</option>
+          <option value="ACADEMIC_SUPERVISOR">Academic Supervisor</option>
+          <option value="INTERNSHIP_ADMIN">Admin</option>
         </select>
         
         {/*the login button */}
