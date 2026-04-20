@@ -1,4 +1,4 @@
-
+// src/services/api.js
 const BASE_URL = "http://127.0.0.1:8000";
 
 // --- Token & User Helpers ---
@@ -9,10 +9,11 @@ export const getUser = () => JSON.parse(localStorage.getItem("iles_user")) || nu
 export const logOut = () => {
     localStorage.removeItem("iles_token");
     localStorage.removeItem("iles_user");
+    localStorage.removeItem("iles_refresh"); // also clear refresh token on logout
 };
 
-// --- Core Fetch Wrapper ---
-async function apiFetch(path, options = {}) {
+// --- Core Fetch Wrapper with Token Refresh ---
+async function apiFetch(path, options = {}, isRetry = false) {
     const token = getToken();
     const { skipAuth, ...fetchOptions } = options;
     const headers = {
@@ -20,31 +21,60 @@ async function apiFetch(path, options = {}) {
         ...(!skipAuth && token ? { Authorization: `Bearer ${token}` } : {}),
         ...fetchOptions.headers,
     };
-    
+
     const response = await fetch(`${BASE_URL}${path}`, { ...fetchOptions, headers });
+
+    // If 401 Unauthorized and not already retrying, try to refresh the token
+    if (response.status === 401 && !isRetry && !skipAuth) {
+        const refreshToken = localStorage.getItem("iles_refresh");
+        if (refreshToken) {
+            try {
+                const refreshResponse = await fetch(`${BASE_URL}/token/refresh/`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ refresh: refreshToken }),
+                });
+                if (refreshResponse.ok) {
+                    const { access } = await refreshResponse.json();
+                    saveToken(access);
+                    // Retry the original request with the new token
+                    return apiFetch(path, options, true);
+                }
+            } catch (err) {
+                console.error("Token refresh failed", err);
+            }
+        }
+        // Refresh failed – force logout and redirect to login
+        logOut();
+        window.location.href = "/";
+        throw new Error("Session expired. Please log in again.");
+    }
 
     let data = null;
     try {
         data = await response.json();
     } catch {
-        // Handle non-JSON response
+        // non-JSON response
     }
 
     if (!response.ok) {
-        throw new Error(
-            data?.message || data?.error || `Request failed (${response.status})`
-        );
+        throw new Error(data?.message || data?.error || `Request failed (${response.status})`);
     }
     return data;
 }
 
 // --- Authentication Functions ---
 export async function loginUser({ email, password, role }) {
-    return apiFetch('/login/', {
+    const data = await apiFetch('/login/', {
         method: 'POST',
         body: JSON.stringify({ email, password, role }),
         skipAuth: true,
     });
+    // If the backend returns a refresh token, store it
+    if (data && data.refresh_token) {
+        localStorage.setItem('iles_refresh', data.refresh_token);
+    }
+    return data;
 }
 
 export async function registerUser({ username, email, password, confirmPassword, role }) {
@@ -57,17 +87,19 @@ export async function registerUser({ username, email, password, confirmPassword,
             confirm_password: confirmPassword,
             role,
         }),
+        skipAuth: true,
     });
 }
 
 export async function forgotPassword({ email, newPassword, confirmPassword }) {
     return apiFetch("/forgot-password/", {
         method: "POST",
-        body: JSON.stringify({ 
-            email, 
-            new_password: newPassword, 
-            confirm_password: confirmPassword 
+        body: JSON.stringify({
+            email,
+            new_password: newPassword,
+            confirm_password: confirmPassword,
         }),
+        skipAuth: true,
     });
 }
 
@@ -75,11 +107,11 @@ export async function forgotPassword({ email, newPassword, confirmPassword }) {
 export const getPlacements = () => apiFetch('/placements/');
 export const getPlacement = (id) => apiFetch(`/placements/${id}/`);
 export const createPlacement = (data) => apiFetch('/placements/', {
-    method: 'POST', 
+    method: 'POST',
     body: JSON.stringify(data)
 });
 export const updatePlacement = (id, data) => apiFetch(`/placements/${id}/`, {
-    method: 'PATCH', 
+    method: 'PATCH',
     body: JSON.stringify(data)
 });
 
@@ -87,11 +119,11 @@ export const updatePlacement = (id, data) => apiFetch(`/placements/${id}/`, {
 export const getWeeklyLogs = () => apiFetch('/logs/');
 export const getWeeklyLog = (id) => apiFetch(`/logs/${id}/`);
 export const createWeeklyLog = (data) => apiFetch('/logs/', {
-    method: 'POST', 
+    method: 'POST',
     body: JSON.stringify(data)
 });
 export const updateWeeklyLog = (id, data) => apiFetch(`/logs/${id}/`, {
-    method: 'PATCH', 
+    method: 'PATCH',
     body: JSON.stringify(data)
 });
 
@@ -99,7 +131,7 @@ export const updateWeeklyLog = (id, data) => apiFetch(`/logs/${id}/`, {
 export const getEvaluations = () => apiFetch('/evaluations/');
 export const getEvaluation = (id) => apiFetch(`/evaluations/${id}/`);
 export const createEvaluation = (data) => apiFetch('/evaluations/', {
-    method: 'POST', 
+    method: 'POST',
     body: JSON.stringify(data)
 });
 

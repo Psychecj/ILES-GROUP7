@@ -6,20 +6,52 @@ import ForgotPassword from "./pages/ForgotPassword";
 import WorkplaceSupervisorDashboard from "./pages/WorkplaceSupervisorDashboard";
 import AcademicSupervisorDashboard from "./pages/AcademicSupervisorDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import ProtectedRoute from "./components/ProtectedRoute"; // 👈 added route guard
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Public routes – no authentication needed */}
         <Route path="/" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/student" element={<StudentDashboard />} />
-        <Route path="/workplace-supervisor" element={<WorkplaceSupervisorDashboard />} />
-        <Route path="/academic-supervisor" element={<AcademicSupervisorDashboard />} />
-        <Route path="/admin" element={<AdminDashboard />} />
+
+        {/* Protected dashboard routes – only accessible when logged in with correct role */}
+        <Route
+          path="/student"
+          element={
+            <ProtectedRoute allowedRoles={["STUDENT"]}>
+              <StudentDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/supervisor"
+          element={
+            <ProtectedRoute allowedRoles={["WORKPLACE_SUPERVISOR"]}>
+              <WorkplaceSupervisorDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/academic"
+          element={
+            <ProtectedRoute allowedRoles={["ACADEMIC_SUPERVISOR"]}>
+              <AcademicSupervisorDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute allowedRoles={["INTERNSHIP_ADMIN"]}>
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </BrowserRouter>
   );
 }
-export default App; 
+export default App;
