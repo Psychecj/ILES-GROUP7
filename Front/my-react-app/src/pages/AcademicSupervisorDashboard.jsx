@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';  //For placement of logs. useEffect that fetches all three using a Promise.all.
+import { useNavigate } from 'react-router-dom'; 
 import { getUser, logOut, getPlacements, getWeeklyLogs, getGrades } from '../services/api';
 import './AcademicSupervisorDashboard.css';
 
