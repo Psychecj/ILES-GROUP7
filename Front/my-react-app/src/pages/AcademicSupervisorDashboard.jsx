@@ -1,11 +1,19 @@
 import Navbar from "../components/Navbar";
 import { useState, useEffect } from "react";
 import { getPlacements, getWeeklyLogs, getGrades } from "../services/api";
+import { useNavigate } from "react-router-dom"; // this is a named export, so we use curly braces to import.
+import { logOut } from "../services/api";
 
 export default function AcademicSupervisorDashboard() {
   const [placements, setPlacements] = useState([]);
   const [logs, setLogs] = useState([]);
   const [grades, setGrades] = useState([]);
+
+  const navigate = useNavigate();
+  const handleLogout = () => {
+    logOut(); // Clear token and user info from localStorage
+    navigate('/'); // Redirect to login page
+  }
 
   useEffect(() => {
     getPlacements().then(res => setPlacements(res.data));
@@ -17,6 +25,9 @@ export default function AcademicSupervisorDashboard() {
     <div>
        <Navbar /> 
       <h2>Academic Supervisor Dashboard</h2>
+      <button onClick={handleLogout} style={{ position: 'absolute', top: '10px', right: '10px', padding: '8px 12px', background: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+  Logout
+</button>
       {placements.map(p => (
         <div key={p.id}>
           <h3>{p.student_name}</h3>
