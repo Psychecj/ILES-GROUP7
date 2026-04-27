@@ -80,4 +80,28 @@ class EvaluationFormSerializer(serializers.ModelSerializer):
 class FinalGradeSerializer(serializers.ModelSerializer):
     class Meta:
         model = FinalGrade 
-        fields = '__all__'      
+        fields = '__all__'
+
+class LogReviewSerializer(serializers.ModelSerializer):
+    supervisor = UserSerializer(read_only=True)
+
+    class Meta:
+        model = LogReview
+        fields = '__all__'
+        read_only_fields = ['supervisor', 'reviewed_at']  
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = '__all__'
+        read_only_fields = ['recipient', 'created_at']
+
+class FlagSerializer9serializers.ModelSerializer):
+    raised_by = UserSerializer(read_only=True)
+
+    class Meta:
+        model = Flag
+        fields = '__all__'
+        read_only_fields = ['raised_by', 'created_at']
+
+
