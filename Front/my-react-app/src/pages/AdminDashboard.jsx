@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import Navbar from "../components/Navbar";
 import { useState, useEffect } from "react";
 import { getPlacements, updatePlacement } from "../services/api";
@@ -7,13 +8,38 @@ import { logOut } from "../services/api";
 export default function AdminDashboard() {
   const [placements, setPlacements] = useState([]);
   const navigate = useNavigate();
+=======
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { getUser, logOut, getPlacements, updatePlacement } from '../services/services/api';
+import './AdminDashboard.css';
+
+export default function AdminDashboard() {
+  const [placements, setPlacements] = useState([]); // we start with an empty array
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const user = getUser();
+>>>>>>> e4d34376dcc4c5451cd161cd622a7a2e2da2d5df
 
   useEffect(() => {
-    getPlacements().then(res => setPlacements(res.data));
+    // we add a catch here because if the backend returns 401 res.data will be empty
+    getPlacements()
+      
+      .then(data => {
+        if (res.data) setPlacements(data.results ?? data);
+      })
+      .catch(err => console.error("failed to fetch placements probably a 401", err))
+      .finally(() => setLoading(false));
   }, []);
 
   const handleActivate = (id) => {
-    updatePlacement(id, { status: "Active" });
+    updatePlacement(id, { status: "Active" })
+      .then(() => {
+        // we update the local state so the button disappears immediately
+        // this avoids needing a page refresh to see the change
+        setPlacements(prev => prev.map(p => p.id === id ? { ...p, status: "Active" } : p));
+      })
+      .catch(err => console.error("failed to update placement", err));
   };
 
   const handleLogout = () => {
@@ -40,7 +66,8 @@ export default function AdminDashboard() {
           </tr>
         </thead>
         <tbody>
-          {placements.map(p => (
+          {/* we use p here instead of item so it matches your table rows */}
+          {placements?.map((p) => (
             <tr key={p.id}>
               <td>{p.student_name}</td>
               <td>{p.company}</td>
