@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { getUser, logOut, getPlacements, getWeeklyLogs, getGrades } from '../services/services/api';
+import { useState, useEffect } from 'react';  //For placement of logs. useEffect that fetches all three using a Promise.all.
+import { useNavigate } from 'react-router-dom'; 
+import { getUser, logOut, getPlacements, getWeeklyLogs, getGrades } from '../services/api';
 import './AcademicSupervisorDashboard.css';
 
 export default function AcademicSupervisorDashboard() {
@@ -11,6 +11,11 @@ export default function AcademicSupervisorDashboard() {
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const user = getUser();
+
+  const handleLogout = () => {
+    logOut();
+    navigate('/');
+  };
 
   useEffect(() => {
     Promise.all([getPlacements(), getWeeklyLogs(), getGrades()])
@@ -27,8 +32,7 @@ export default function AcademicSupervisorDashboard() {
     <div className='as-score-row'>
       <span className='as-score-label'>{label}</span>
       <div className='as-bar-bg'>
-        <div className='as-bar-fill'
-          style={{ width: '${(value / max) * 100}%' }} />
+        <div className='as-bar-fill' style={{ width: `${(value / max) * 100}%` }} />
       </div>
       <span className='as-score-val'>{value}/{max}</span>
     </div>
@@ -41,8 +45,7 @@ export default function AcademicSupervisorDashboard() {
     <div className='as-root'>
       <aside className='as-sidebar'>
         <div className='as-logo'>ILES</div>
-        <button className='as-logout'
-          onClick={() => { logOut(); navigate('/'); }}>
+        <button className='as-logout' onClick={handleLogout}>
           Logout
         </button>
       </aside>
@@ -58,7 +61,7 @@ export default function AcademicSupervisorDashboard() {
               {stuLogs.map(log => (
                 <div key={log.id} className='as-log-row'>
                   <span>Week {log.week}</span>
-                  <span className={'as-badge as-badge-${log.status.toLowerCase()}'}>
+                  <span className={`as-badge as-badge-${log.status.toLowerCase()}`}>
                     {log.status}
                   </span>
                   <span>{log.tasks?.slice(0, 60)}...</span>
@@ -79,4 +82,3 @@ export default function AcademicSupervisorDashboard() {
     </div>
   );
 }
-

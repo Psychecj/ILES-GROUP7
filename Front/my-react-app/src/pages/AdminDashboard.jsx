@@ -1,40 +1,67 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getUser, logOut, getPlacements, updatePlacement } from '../services/services/api';
-import './AdminDashboard.css';
+import { logOut, getPlacements, updatePlacement } from '../services/api';
+// If you have a CSS file, import it; otherwise remove or comment out
+// import './AdminDashboard.css';
 
 export default function AdminDashboard() {
-  const [placements, setPlacements] = useState([]); // we start with an empty array
+  const [placements, setPlacements] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
-  const user = getUser();
 
   useEffect(() => {
-    // we add a catch here because if the backend returns 401 res.data will be empty
     getPlacements()
-      
-      .then(data => {
-        if (res.data) setPlacements(data.results ?? data);
+      .then((data) => {
+        setPlacements(data.results ?? data);
       })
-      .catch(err => console.error("failed to fetch placements probably a 401", err))
+      .catch((err) => {
+        console.error('Failed to fetch placements', err);
+        setError('Could not load placements. Please refresh.');
+      })
       .finally(() => setLoading(false));
   }, []);
 
   const handleActivate = (id) => {
-    updatePlacement(id, { status: "Active" })
+    updatePlacement(id, { status: 'Active' })
       .then(() => {
-        // we update the local state so the button disappears immediately
-        // this avoids needing a page refresh to see the change
-        setPlacements(prev => prev.map(p => p.id === id ? { ...p, status: "Active" } : p));
+        setPlacements((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, status: 'Active' } : p))
+        );
       })
-      .catch(err => console.error("failed to update placement", err));
+      .catch((err) => console.error('Failed to update placement', err));
   };
 
+  const handleLogout = () => {
+    logOut();
+    navigate('/');
+  };
+
+  if (loading) return <div className="loading">Loading placements...</div>;
+  if (error) return <div className="error">{error}</div>;
+
   return (
-    <div>
-      <Navbar />
+    <div style={{ position: 'relative', padding: '20px' }}>
+      {/* Logout button – inline style ensures visibility even without CSS */}
+      <button
+        onClick={handleLogout}
+        style={{
+          position: 'absolute',
+          top: '10px',
+          right: '10px',
+          padding: '8px 12px',
+          background: '#dc3545',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer',
+        }}
+      >
+        Logout
+      </button>
+
       <h2>Admin Dashboard</h2>
-      <table>
+      <table border="1" cellPadding="8" style={{ borderCollapse: 'collapse', width: '100%' }}>
         <thead>
           <tr>
             <th>Student</th>
@@ -46,19 +73,16 @@ export default function AdminDashboard() {
           </tr>
         </thead>
         <tbody>
-          {/* we use p here instead of item so it matches your table rows */}
-          {placements?.map((p) => (
+          {placements.map((p) => (
             <tr key={p.id}>
-              <td>{p.student_name}</td>
-              <td>{p.company}</td>
+              <td>{p.student_name || p.student?.username}</td>
+              <td>{p.company_name || p.company}</td>
               <td>{p.status}</td>
-              <td>{p.academic_supervisor}</td>
-              <td>{p.workplace_supervisor}</td>
+              <td>{p.academic_supervisor?.username || p.academic_supervisor || '—'}</td>
+              <td>{p.workplace_supervisor?.username || p.workplace_supervisor || '—'}</td>
               <td>
-                {p.status !== "Active" && (
-                  <button onClick={() => handleActivate(p.id)}>
-                    Set Active
-                  </button>
+                {p.status !== 'Active' && (
+                  <button onClick={() => handleActivate(p.id)}>Set Active</button>
                 )}
               </td>
             </tr>
