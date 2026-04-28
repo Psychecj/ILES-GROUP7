@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Placement, WeeklyLog, EvaluationForm, FinalGrade
+from .models import User, Placement, WeeklyLog, EvaluationForm, FinalGrade, LogReview, Notification, Flag
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
@@ -10,29 +10,17 @@ class RegisterSerializer(serializers.ModelSerializer):
         def validate(self, data):
             if data['password'] != data['confirm_password']:
                 raise serializers.ValidationError(
-<<<<<<< HEAD
-                    {"confirm password": "Passwords do not match."}
+                     {"confirm password": "Passwords do not match."}
                     )
             return data
-            def create(self, validated_data):
-                validated_data.pop('confirm_password')  # Remove confirm_password before creating the user
-                return User.objects.create_user(
-                    username=validated_data['username'],
-                    email=validated_data['email'],
-                    password=validated_data['password'],
-                    role=validated_data.get('role', 'STUDENT'),
-=======
-                    {"confirm password": "Passwords do not match."})
-                return data
-        def create(self, validated_data):
+         def create(self, validated_data):
             validated_data.pop('confirm_password')  # Remove confirm_password before creating the user
             return User.objects.create_user(
                 username=validated_data['username'],
                 email=validated_data['email'],
                 password=validated_data['password'],
-                role=validated_data.get['role', 'STUDENT'],
->>>>>>> d655a0548dc7b4da30048b3f3cc20ab6a605c731
-                )
+                role=validated_data.get('role', 'STUDENT'),
+              )  # Default to STUDENT if role is not provided)
 
 #first the users serializer
 class UserSerializer(serializers.ModelSerializer):
@@ -62,7 +50,7 @@ class PlacementSerializer(serializers.ModelSerializer):
 
     academic_supervisor_id = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.filter(role='ACADEMIC_SUPERVISOR'),
-        write_only=True, source='academic_supervisor', required=False
+        write_only=True, source='academic_supervisor', required=False, allow_null=True
     )
 
     class Meta:
@@ -92,4 +80,28 @@ class EvaluationFormSerializer(serializers.ModelSerializer):
 class FinalGradeSerializer(serializers.ModelSerializer):
     class Meta:
         model = FinalGrade 
-        fields = '__all__'      
+        fields = '__all__'
+
+class LogReviewSerializer(serializers.ModelSerializer):
+    supervisor = UserSerializer(read_only=True)
+
+    class Meta:
+        model = LogReview
+        fields = '__all__'
+        read_only_fields = ['supervisor', 'reviewed_at']  
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = '__all__'
+        read_only_fields = ['recipient', 'created_at']
+
+class FlagSerializer9serializers.ModelSerializer):
+    raised_by = UserSerializer(read_only=True)
+
+    class Meta:
+        model = Flag
+        fields = '__all__'
+        read_only_fields = ['raised_by', 'created_at']
+
+
