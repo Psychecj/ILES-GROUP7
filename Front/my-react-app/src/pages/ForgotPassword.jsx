@@ -1,49 +1,57 @@
 import { useState } from "react";
-import { requestPasswordReset } from "../services/api"; //this is our new updated path
+import { requestPasswordReset } from "../services/api";
 import { Link } from "react-router-dom";
+import "./ForgotPassword.css";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setMessage(""); //this clear the previous messages
-
+  const handleSubmit = async () => {
+    setLoading(true);
+    setMessage("");
+    setIsError(false);
     try {
       await requestPasswordReset({ email });
-      setMessage("A Reset Link has been sent to your email check");
-      setEmail(""); //this claers the input if succsessful
-
+      setMessage("A reset link has been sent to your email.");
+      setEmail("");
     } catch (err) {
       setIsError(true);
-      setMessage(err.message || "Something went wrong plaese try again");
+      setMessage(err.message || "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div>
-      <h2>Forgot Password</h2>
-      <p>Enter your email to receive a password reset link</p>
-      <form onSubmit={handleSubmit}>
-        <input type="email"
-        placeholder="Email address"
-        value={email}
-        onChange={e => setEmail(e.target.value)}
-        required/>
-        <button type="submit">Send Reset Link</button>
-      </form>
-
-      {message && (
-        <p style={{ clor: isError ? 'red' : 'green', marginTop: '10px'}}>
-          {message}
-        </p>
-      )}
-      <div style={{ marginTop: '20px'}}>
-        <Link to="/">Back to Login</Link>
+    <div className="fp-container">
+      <div className="fp-box">
+        <h2 className="fp-title">Forgot Password</h2>
+        <p className="fp-subtitle">Enter your email to receive a reset link.</p>
+        <input
+          className="fp-input"
+          type="email"
+          placeholder="Email address"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+        />
+        <button
+          className={`fp-btn ${loading ? "fp-btn-loading" : ""}`}
+          onClick={handleSubmit}
+          disabled={loading}>
+          {loading ? "Sending..." : "Send Reset Link"}
+        </button>
+        {message && (
+          <p className={`fp-msg ${isError ? "fp-msg-error" : "fp-msg-success"}`}>
+            {message}
+          </p>
+        )}
+        <div className="fp-back">
+          <Link to="/">Back to Login</Link>
+        </div>
       </div>
-
     </div>
   );
 }

@@ -95,7 +95,7 @@ export async function confirmPasswordReset({ uid, token, newPassword, confirmPas
 export const getPlacements = () => apiFetch('/placements/');
 export const getPlacement = (id) => apiFetch(`/placements/${id}/`);
 export const createPlacement = (data) => apiFetch('/placements/', { method: 'POST', body: JSON.stringify(data) });
-export const updatePlacement = (id, data) => apiFetch(`/placements/${id}//`, { method: 'PATCH', body: JSON.stringify(data) });
+export const updatePlacement = (id, data) => apiFetch(`/placements/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
 
 // --- Weekly Logs ---
 export const getWeeklyLogs = () => apiFetch('/logs/');
@@ -118,3 +118,16 @@ export const getEvaluations = () => apiFetch('/evaluations/');
 export const getEvaluation = (id) => apiFetch(`/evaluations/${id}/`);
 export const createEvaluation = (data) => apiFetch('/evaluations/', { method: 'POST', body: JSON.stringify(data) });
 export const getGrades = () => apiFetch('/grades/');
+
+// --- New API functions ---
+export const updateEvaluation = (id, data) => apiFetch(`/evaluations/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
+
+export const getNotifications = () => apiFetch('/notifications/');
+
+export const markNotificationRead = (id) => apiFetch(`/notifications/${id}/`, { method: 'PATCH', body: JSON.stringify({ is_read: true }) });
+
+export const createFlag = (data) => apiFetch('/flags/', { method: 'POST', body: JSON.stringify(data) });
+
+export const getAdminStats = () => apiFetch('/admin/stats/');
+
+export const createGrade = (placementId, academicScore, remarks = '') => apiFetch('/grades/create/', { method: 'POST', body: JSON.stringify({ placement: placementId, academic_score: academicScore, remarks: remarks }) });

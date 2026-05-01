@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getUser, logOut, getPlacements, updatePlacement } from '../services/services/api';
+import { getUser, logOut, getPlacements, updatePlacement } from '../services/api';
 import './AdminDashboard.css';
 
 export default function AdminDashboard() {
