@@ -3,7 +3,7 @@ from django.shortcuts import render
 from .permissions import IsStudentOnly, IsWorkplaceSupervisorOnly, IsAcademicSupervisorOnly
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import request, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from .models import User, Placement, WeeklyLog, EvaluationForm, FinalGrade
 from .serializers import (
@@ -164,15 +164,27 @@ class EvaluationListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        qs = EvaluationForm.objects.filter(
+        role = request.user.role
+        if role == 'WORKPLACE_SUPERVISOR':
+            qs = EvaluationForm.objects.filter(submitted_by=request.user)
+        elif role == 'ACADEMIC_SUPERVISOR':
+            qs = EvaluationForm.objects.filter(
             placement__workplace_supervisor=request.user
         )
+        elif role == 'INTERNSHIP ADMIN':
+            qs = EvaluationForm.objects.all()
+        else:
+            qs = EvaluationForm.objects.filter(placement__student=request.user)
         return Response(EvaluationFormSerializer(qs, many=True).data)
         
     def post(self, request):
         s = EvaluationFormSerializer(data=request.data)
         if s.is_valid():
-            s.save(submitted_by= request.user)
+            eval_obj = s.save(submitted_by=request.user)
+            for admin_user in User.objects.filter(role='INTERNSHIP_ADMIN'):
+                create_notification(
+                    admin_user,
+                    f"Evaluation submitted for placement #{eval_obj.placement_id}")
             return Response(s.data, status=201)
         return Response(s.errors, status=400)
     
@@ -218,17 +230,50 @@ class FinalGradeView(APIView):
         return Response(FinalGradeSerializer(qs, many=True).data)
     
 class FinalGradeCreateView(APIView):
+    """POST/grades/create/
+    Academic supervisor submits the final grade for a student.
+    The weighted score is auto-computed inside FinalGrade.save().
+    Prevents duplicate submission via get_or_create pattern."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         if request.user.role != 'ACADEMIC_SUPERVISOR':
-            return Response({'error':'Only academic supervisors can post grades'}, status=403
+            return Response({'error':'Only academic supervisors can  submit grades'}, status=403
             )
-        s = FinalGradeSerializer(data=request.data)
-        if s.is_valid():
-            s.save(computed_by=request.user)
-            return Response(s.data, status=201)
-        return Response(s.errors, status=400)
+        placement_id = request.data.get('placement')
+        academic_score = request.data.get('academic_score', 0)
+        remarks = request.data.get('remarks', '')
+        #Validate placement exists and belongs to this supervisor
+    try:
+          placement = Placement.objects.get(pk=placement_id, academic_supervisor=request.user)
+    except Placement.DoesNotExist:
+        return Response({'error':'Placement not found or not assigned to you'}, status=404)  
+        #Prevent double submission - check if grade already exists
+    if hasattr(placement, 'final_grade') and placement.final_grade.published:
+        return Response({'error': 'Grade already published for this placement'}, status=400) 
+    #Check WP evaluation is submitted before grading
+    wp_eval_exists = EvaluationForm.objects.filter(placement=placement,status__in=['Submitted', 'Reviewed']).exists()
+    if not wp_eval_exists:
+        return Response({'error':'Workplace supervisor evaluation must be submitted before grading'},status=400)
+    #get_or_create prevents duplicate grades at application level too
+    grade, created = FinalGrade.objects.get_or_create(
+        placement=placement, defaults={'computed_by': request.user, 'academic_score': float(academic_score), 'remarks': remarks}
+    )
+    if not created:
+        #Update existing draft grade
+        grade.academic_score = float(academic_score)
+        grade.remarks = remarks
+        grade.computed_by = request.user
+        grade.save()  #triggers compute_weighted_score() automatically
+    
+    return Response({'success': True,
+                     'grade': FinalGradeSerializer(grade).data,
+                     'breakdown': {
+                         'formula': 'technical(*4)+ communication(*3)+ punctuality(*3)',
+                         'computed_score': grade.score,
+                         'grade_letter': grade.grade_letter,
+                         'note': 'Score auto-computed from WP evaluation form'}
+                     }, status=201 if created else 200)
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
@@ -317,3 +362,25 @@ class ConfirmPasswordResetView(APIView):
             return Response({'success': True, 'message': 'Password reset successful'}, status=200)
         
         return Response({'error': 'The reset link is invalid or has expired please try again.'}, status=400)
+    
+    class PublishGradeView(APIView):
+        permission_classes = [IsAuthenticated]
+        def post (self,request, pk):
+            if request.user.role != 'INTERNSHIP_ADMIN':
+                return Response({'error':'Admin Only'}, status=403)
+            try:
+                grade = FinalGrade.objects.get(pk=pk)
+            except FinalGrade.DoesNotExist:
+                return Response({'error':'Grade not found'}, status=404)
+            grade.published = True
+            grade.save()
+            placement = grade.placement
+            try:
+                placement.change_status('Completed')
+            except Exception:
+                pass #already Completed is fine
+            create_notification(
+                placement.student,
+                f"Your final grade has been published. Score: {grade.score} ({grade.grade_letters})"
+            )
+            return Response (FinalGradeSerializer(grade).data)

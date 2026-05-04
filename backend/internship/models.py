@@ -37,6 +37,7 @@ class User(AbstractUser):
 
     def __str__(self) -> str:
         return f"{self.username} ({self.role})"
+    profile_picture = models.ImageField( upload_to='profile_pictures/', null=True, blank=True)
 
 
 class WeeklyLog(models.Model):
@@ -133,6 +134,9 @@ class Placement(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     #deadline enforcemennt
     deadline = models.DateField(null=True, blank=True)
+    address = models.CharField(max_length=500, blank=True)
+    approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, relatedname='approved_placements', limit_choices_to={'role': 'INTERNSHIP_ADMIN'})
+    
 
     def change_status(self, new_status):
         validate_transition(self.status, new_status, VALID_PLACEMENT_TRANSITIONS)
@@ -146,13 +150,34 @@ class Placement(models.Model):
 class FinalGrade(models.Model):
     placement = models.OneToOneField(Placement, on_delete=models.CASCADE, related_name='final_grade')
     computed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='computed_grades')
+    academic_score = models.FloatField(
+        default=0,
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
+    #Weighted total - auto-computed, never set manually
     score = models.FloatField(default=0)
     grade_letter = models.CharField(max_length=5, blank=True)
     published = models.BooleanField(default=False)
     computed_at = models.DateTimeField(auto_now_add=True)
+    remarks - models.TextField(blank=True)
 
-    def __str__(self):
-        return f"Grade for {self.placement.student.username} : {self.grade_letter}" 
+    def compute_weighted_score(self):
+        """Weighted formula (matches course outline Week 9):
+        WP technical_skills (out of 10)* 4 = up to 40 points
+        WP communication_skills(out of 10)*3 = up to 30 points
+        WP punctuality(out of 10)*3 = up to 30 points
+        TOTAL = 100 points maximum
+        Academic supervisor's score is stored separately for reference but the weighted formula uses WP eval scores."""
+        try:
+            wp_eval = EvaluationForm.objects.filter(placement=self.placement, status__in=['Submitted', 'Reviewed']
+                                                    ).latest('submitted_at')
+            technical = wp_eval.technical_skills #0-10
+            communication = wp_eval.communication_skills #0-10
+            punctuality = wp_eval.punctuality #0-10 
+            weighted = (technical*4) + (communication*3) + (punctuality*3)
+            return round(weighted, 2)
+        except EvaluationForm.DoesNotExist:
+            return round(self.academic_score, 2)
     
     def compute_grade_letter(self):
         if self.score >= 70:
@@ -166,10 +191,49 @@ class FinalGrade(models.Model):
         else:
             return 'F'
         
-    def save(self,*args,**kwargs):
+    def save(self,*args,**kwargs):#auto-compute score and grade every time the record is saved
+        self.score = self.compute_weighted_score()
         self.grade_letter = self.compute_grade_letter() 
         super().save(*args,**kwargs)  
+
+    def __str__(self):
+        return f"Grade for {self.placement.student.username}:{self.grade_letter} ({self.score}/100)"
+    class Meta:
+    #Prevent double submission - enforced at DB level
+    #OneToOneField already guarantees one grade per placement
+        pass
         
+
+class LogReview(models.Model):
+    log = models.ForeignKey(WeeklyLog, on_delete = models.CASCADE, related_name='reviews')  
+    supervisor = models.ForeignKey(User, on_delete = models.SET_NULL, null = True, related_name = 'log_reviews')
+    decision = models.Charfield(max_length = 20, choices= [('Approved', 'Approved'),('Rejected', 'Rejected')]
+                                )      
+    comment = models.TextField(blank = True)
+    reviewed_at = models.DateTimeField(auto_now_add = True)
+    def __str__(self):
+        return f"Review of Log# {self.log_id} by {self.supervisor} - {self.decision}"
+    
+
+class Notification(models.Model):
+    recipient = models.ForeignKey(User, on_delete = models.CASCADE, related_name = 'notifications')
+    message = models.TextField()
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        ordering = ['-created_at']
+        def __str__(self):
+            return f"Notification for {self.recipient.username}: {self.message[:40]}"
+        
+class Flag(models.Model):
+    student = models.ForeinKey(User, on_delete=models.CASCADE, related_name='flags', limit_choices_to={'role':'STUDENT'}
+                               )
+    raised_by = models.ForeignKey(User, on_delete=models,SET_NULL, null=True, related_name='raised_flags')
+    reason = models.TextField()
+    created_at = models.DataTimeField(auto_now_add=True)
+    def __str__(self):
+        return f"Flag on {self.student.username} by {self.raised_by}"
+
 
 
     

@@ -2,6 +2,7 @@
   max-width: 900px;
   margin: 0 auto;
   padding: 2rem;
+    background: linear-gradient(135deg, #1a2d52 0%, #0d7c8f 100%);
   font-family: sans-serif;
 }
 
