@@ -9,13 +9,15 @@ export default function ForgotPassword() {
   const [isError, setIsError] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async () => {
-    setLoading(true);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     setMessage("");
     setIsError(false);
+    setLoading(true);
+
     try {
       await requestPasswordReset({ email });
-      setMessage("A reset link has been sent to your email.");
+      setMessage("A reset link has been sent to your email. Check your inbox.");
       setEmail("");
     } catch (err) {
       setIsError(true);

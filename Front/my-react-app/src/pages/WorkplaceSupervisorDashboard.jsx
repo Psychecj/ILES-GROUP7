@@ -77,7 +77,10 @@ export default function WorkplaceSupervisorDashboard() {
     }
   };
 
-  const handleLogout = () => { logOut(); navigate('/'); };
+  const handleLogout = () => {
+    logOut();
+    navigate('/');
+  };
 
   if (loading) return <div className="ws-loading">Loading...</div>;
 

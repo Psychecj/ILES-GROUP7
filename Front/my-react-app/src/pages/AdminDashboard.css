@@ -1,15 +1,42 @@
-.ad-root { min-height:100vh; background:#F8FAFC; padding:2rem; }
-.ad-header { display:flex; justify-content:space-between;
-  align-items:center; margin-bottom:1.5rem; }
-.ad-title { font-size:1.4rem; font-weight:700; color:#1A1A2E; }
-.ad-logout { background:none; border:1px solid #E2E8F0;
-  border-radius:6px; padding:8px 16px;
+.ad-root { 
+  min-height:100vh; 
+  background:#F8FAFC; 
+  padding:2rem; 
+}
+
+.ad-header { 
+  display:flex; 
+  justify-content:space-between;
+  align-items:center; 
+  margin-bottom:1.5rem; }
+
+.ad-title { 
+  font-size:1.4rem; 
+  font-weight:700; 
+  color:#1A1A2E; }
+
+.ad-logout { 
+  background:none; 
+  border:1px solid #E2E8F0;
+  border-radius:6px; 
+  padding:8px 16px;
   cursor:pointer; color:#6B7280; }
-.ad-table-wrap { background:#fff; border:1px solid #E2E8F0;
-  border-radius:8px; overflow:hidden; }
-.ad-table { width:100%; border-collapse:collapse; }
-.ad-table th { background:#F1F5F9; color:#475569;
-  font-size:.75rem; text-transform:uppercase;
+
+.ad-table-wrap { 
+  background:#fff; 
+  border:1px solid #E2E8F0;
+  border-radius:8px; 
+  overflow:hidden; }
+
+.ad-table { 
+  width:100%; 
+  border-collapse:collapse; }
+
+.ad-table th { 
+  background:#F1F5F9; 
+  color:#475569;
+  font-size:.75rem; 
+  text-transform:uppercase;
   padding:10px 14px; text-align:left; }
 .ad-table td { padding:10px 14px; border-top:1px solid #F1F5F9;
   font-size:.875rem; color:#374151; }
