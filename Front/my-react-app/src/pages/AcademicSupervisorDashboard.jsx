@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getUser, logOut, getPlacements, getWeeklyLogs, getGrades } from '../services/api';
 import { getUser, logOut, getPlacements, getWeeklyLogs, getGrades, getEvaluations } from '../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import './AcademicSupervisorDashboard.css';
