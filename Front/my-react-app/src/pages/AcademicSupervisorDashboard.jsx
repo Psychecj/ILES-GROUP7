@@ -1,28 +1,35 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getUser, logOut, getPlacements, getWeeklyLogs, getGrades, createGrade } from '../services/api';
+import { getUser, logOut, getPlacements, getWeeklyLogs, getGrades, getEvaluations } from '../services/api';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import './AcademicSupervisorDashboard.css';
 
 export default function AcademicSupervisorDashboard() {
   const [placements, setPlacements] = useState([]);
   const [logs, setLogs] = useState([]);
   const [grades, setGrades] = useState([]);
+  const [evaluations, setEvaluations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const navigate = useNavigate();
-  const user = getUser();
-
-  // Grade form state
   const [gradeForm, setGradeForm] = useState({ placement: '', score: '', remarks: '' });
   const [gradeMsg, setGradeMsg] = useState('');
   const [activePlacementId, setActivePlacementId] = useState(null);
 
+  const navigate = useNavigate();
+  const user = getUser();
+
   useEffect(() => {
-    Promise.all([getPlacements(), getWeeklyLogs(), getGrades()])
-      .then(([pData, lData, gData]) => {
-        setPlacements(pData.results ?? pData);
-        setLogs(lData.results ?? lData);
-        setGrades(gData.results ?? gData);
+    Promise.all([
+      getPlacements(),
+      getWeeklyLogs(),
+      getGrades(),
+      getEvaluations()
+    ])
+      .then(([pData, lData, gData, eData]) => {
+        setPlacements(Array.isArray(pData) ? pData : pData.results ?? []);
+        setLogs(Array.isArray(lData) ? lData : lData.results ?? []);
+        setGrades(Array.isArray(gData) ? gData : gData.results ?? []);
+        setEvaluations(Array.isArray(eData) ? eData : eData.results ?? []);
       })
       .catch(() => setError('Failed to load dashboard data.'))
       .finally(() => setLoading(false));
@@ -43,7 +50,6 @@ export default function AcademicSupervisorDashboard() {
       setGradeMsg('Grade submitted successfully!');
       setActivePlacementId(null);
       setGradeForm({ placement: '', score: '', remarks: '' });
-      // Refresh grades list
       const data = await getGrades();
       setGrades(data.results ?? data);
       setTimeout(() => setGradeMsg(''), 3000);
@@ -51,6 +57,15 @@ export default function AcademicSupervisorDashboard() {
       setGradeMsg('Error: ' + (err.message || 'Submission failed'));
       console.error(err);
     }
+  };
+
+  // Prepare chart data: average of evaluation scores
+  const getChartData = () => {
+    if (!evaluations.length) return [];
+    const avgTech = evaluations.reduce((sum, e) => sum + (e.technical_skills || 0), 0) / evaluations.length;
+    const avgComm = evaluations.reduce((sum, e) => sum + (e.communication_skills || 0), 0) / evaluations.length;
+    const avgPunc = evaluations.reduce((sum, e) => sum + (e.punctuality || 0), 0) / evaluations.length;
+    return [{ name: 'Average', Technical: avgTech, Communication: avgComm, Punctuality: avgPunc }];
   };
 
   const ScoreBar = ({ label, value, max = 10 }) => (
@@ -75,6 +90,7 @@ export default function AcademicSupervisorDashboard() {
       <main className='as-main'>
         <h1 className='as-title'>Academic Supervisor Dashboard</h1>
         {gradeMsg && <div className='as-success'>{gradeMsg}</div>}
+
         {placements.map(p => {
           const stuLogs = logs.filter(l => l.placement === p.id);
           const stuGrades = grades.filter(g => g.placement === p.id);
@@ -135,6 +151,25 @@ export default function AcademicSupervisorDashboard() {
             </div>
           );
         })}
+
+        {/* Bar chart for average evaluation scores */}
+        {getChartData().length > 0 && (
+          <div className='as-chart-box'>
+            <h3>Evaluation Scores Overview (Average across all students)</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={getChartData()} barGap={4}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#DEE2E6" />
+                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                <YAxis domain={[0, 10]} tick={{ fontSize: 12 }} />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="Technical" fill="#1A73E8" radius={[4,4,0,0]} />
+                <Bar dataKey="Communication" fill="#2E7D32" radius={[4,4,0,0]} />
+                <Bar dataKey="Punctuality" fill="#E65100" radius={[4,4,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </main>
     </div>
   );
