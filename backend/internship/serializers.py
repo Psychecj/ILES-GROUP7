@@ -26,7 +26,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta: #this is an inner class i use to provide meta data or configuration data about the main class
         model = User
-        fields = ['id','username','email','role']
+        fields = ['id','username','email','role',]
         #im not including the password fied coz this would expose it 
 
 #now the placement serializer
