@@ -26,7 +26,7 @@ SECRET_KEY = config('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('PRODUCTION_MODE', default=False, cast=bool) == False
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1'
+ALLOWED_HOSTS = ['localhost', '127.0.0.1',
 '.onrender.com'] #add render domain when deployed
 
 
@@ -170,5 +170,6 @@ if not DEBUG:
     EMAIL_USE_TLS = True
     EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
     EMAIL_HOST_PASSWORD = config('EMAIL_PASS', default='')
+else:    
 
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'    
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'    

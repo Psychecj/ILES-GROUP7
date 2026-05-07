@@ -11,4 +11,4 @@ gunicorn==22.0.0
 whitenoise==6.7.0
 # Utilities
 python-decouple==3.8
-Pillow==11.0.0 for profile pic
+Pillow==11.0.0 #for profile pic
