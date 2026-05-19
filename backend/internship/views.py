@@ -369,7 +369,8 @@ class RequestPasswordResetView(APIView):
                 'success': True,
                 'message': 'A reset link has been sent to your email check'
             }, status=200)
-
+            #we return success even if the usr doesnt exist for security reasons
+            #we dont want to reveal if an email is registered or not to potential attackers
         except User.DoesNotExist:
             #we return success even if the usr doesnt exist for security reasons
             #we dont want to reveal if an email is registered or not to potential attackers
@@ -417,6 +418,9 @@ class NotificationListView(APIView):
     def get(self, request):
         qs = request.user.notifications.all()
         return Response(NotificationSerializer(qs, many=True).data)
+    # Handles marking a single notification as read.
+# Only the owner of the notification can mark it — we scope the lookup to
+# request.user.notifications so a user cannot mark someone else's notification
 class NotificationDetailView(APIView):
     permission_classes = [IsAuthenticated]
     def patch(self, request, pk):
@@ -424,8 +428,13 @@ class NotificationDetailView(APIView):
             notif = request.user.notifications.get(pk=pk)
         except Exception:
             return Response({'error':'Notification not found'}, status=404) 
+        # Mark the notification as read.
+        # NOTE: the model field is `is_read` — using `notif.read` would silently set
+        # a non-existent attribute and never actually update the database column.
         notif.is_read = True
         notif.save()
+        
+        # Return the updated notification so the frontend can reflect the change immediately
         return Response(NotificationSerializer(notif).data)    
 
     
@@ -450,9 +459,14 @@ class PublishGradeView(APIView):
                 f"Your final grade has been published. Score: {grade.score} ({grade.grade_letter})"
             )
         return Response (FinalGradeSerializer(grade).data)
-    
+    # Allows an authenticated user to raise a flag on a placement or log.
+    # Flags are used to escalate concerns to the internship admin.
+    # IMPORTANT: `permission_classes` must be spelled exactly right — DRF only
+    # recognises this specific attribute name. A typo like `permision_classes`
+    # (one s) is silently ignored, leaving the endpoint completely unprotected
+    # so anyone on the internet could POST flags without logging in.
 class FlagCreateView(APIView):
-    permision_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
     # was: permission_classes (typo - endpoint was unprotected)
     def post(self, request):
         s = FlagSerializer(data=request.data)
