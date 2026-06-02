@@ -34,6 +34,8 @@ class User(AbstractUser):
     USERNAME_FIELD = 'email'
     #now both these fields will be asked for when creating super user
     REQUIRED_FIELDS = ['username','role']
+    
+    #optional profile picture field for users, stored in 'profile_pictures/' directory
     profile_picture = models.ImageField( upload_to='profile_pictures/', null=True, blank=True)
 
 
@@ -42,6 +44,10 @@ class User(AbstractUser):
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="STUDENT")
 
     def __str__(self) -> str:
+        """
+        Returns a human-readable representation of the user.
+        Useful in Django admin and debugging.
+        """
         return f"{self.username} ({self.role})"
     
 
@@ -64,16 +70,25 @@ class WeeklyLog(models.Model):
 
     # Free-form summary of tasks completed this week.
     description = models.TextField()
+    # Current workflow state of the log (Draft, Submitted, Reviewed, etc.)
     status = models.CharField(max_length=20, choices= LOG_STATUSES, default="Draft")
+    # Placement associated with this internship report
     placement = models.ForeignKey('Placement', on_delete=models.SET_NULL, null=True, blank=True, related_name='logs')
+    # Total hours worked during the week
     hours = models.PositiveIntegerField(default=0)
-
+    # Skills acquired during the reporting period
     skills = models.TextField(blank=True)
+    # Challenges encountered during the week
     challenges = models.TextField(blank=True)
+    # Optional supporting document or evidence
     attachment = models.FileField(upload_to = 'log_attachments/', null=True, blank=True)
+    # Feedback provided by a supervisor
     supervisor_comment = models.TextField(blank=True)
+    # Timestamp when the student officially submitted the log
     submitted_at = models.DateTimeField(null=True, blank=True)
+    # Timestamp when the record was first created
     created_at = models.DateTimeField(auto_now_add=True)
+    # Timestamp of the most recent modification
     updated_at = models.DateTimeField(auto_now=True)
 
     def clean(self):
@@ -90,12 +105,24 @@ class WeeklyLog(models.Model):
                 )
             
     def save(self, *args, **kwargs):
+        """
+        Automatically records the submission timestamp when
+        a draft log is moved to the Submitted state.
+
+        Performs full model validation before saving.
+        """
         if self.status == 'Submitted' and not self.submitted_at:
             self.submitted_at = timezone.now()
         self.full_clean()
         super().save(*args, **kwargs)
 
     def change_status(self, new_status):
+        """
+        Changes the workflow state of the log.
+
+        Validates that the requested transition is allowed
+        according to the internship workflow rules.
+        """
         validate_transition(self.status, new_status, VALID_LOG_TRANSITIONS)
         self.status = new_status
         self.save()
@@ -116,7 +143,9 @@ class EvaluationForm(models.Model):
     Evaluations assess technical skills, communication ability,
     punctuality, and overall performance.
     """
+    # Placement being evaluated
     placement = models.ForeignKey('Placement', on_delete=models.CASCADE, related_name='evaluations')
+    # Supervisor who submitted this evaluation
     submitted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='submitted_evaluations')    
     technical_skills = models.IntegerField(
         default=0,
@@ -130,12 +159,17 @@ class EvaluationForm(models.Model):
         default=0,
         validators=[MinValueValidator(0),MaxValueValidator(10)]
         ) #this is the score out of 10 for the punctuality of the student
+    # Additional qualitative remarks about student performance
     overall_comments = models.TextField(blank=True)
+    # Current workflow state of the evaluation
     status = models.CharField(max_length=20, choices=EVAL_STATUSES, default='Draft')
+    # Timestamp when evaluation was created
     created_at = models.DateTimeField(auto_now_add=True)
+    # Timestamp when evaluation was formally submitted
     submitted_at = models.DateTimeField(null=True, blank=True)
 
     def change_status(self, new_status):
+        
         validate_transition(self.status, new_status, VALID_EVAL_TRANSITIONS)
         self.status = new_status
         if new_status == 'Submitted':
@@ -195,6 +229,12 @@ class Placement(models.Model):
     
 
     def change_status(self, new_status):
+        """
+        Changes the placement workflow status.
+
+        Ensures only valid transitions are allowed,
+        such as Pending -> Active -> Completed.
+        """
         validate_transition(self.status, new_status, VALID_PLACEMENT_TRANSITIONS)
         self.status = new_status
         self.save()
@@ -203,6 +243,13 @@ class Placement(models.Model):
         return f"{self.student.username} at {self.company_name} ({self.status})" 
 
     def clean(self):
+        """
+        Performs business-rule validation.
+
+        Rules:
+        - End date must be after start date.
+        - A student cannot have overlapping active placements.
+        """
         if self.start_date and self.end_date:
             if self.start_date >= self.end_date:
                raise DjangoValidationError("End date must be after start date.") 
@@ -230,17 +277,24 @@ class FinalGrade(models.Model):
     Grades are automatically calculated from workplace
     supervisor evaluations and mapped to a letter grade.
     """
+    # Placement receiving the final grade
     placement = models.OneToOneField(Placement, on_delete=models.CASCADE, related_name='final_grade')
+    # User responsible for computing the grade
     computed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='computed_grades')
+    # Academic supervisor's score (0-100)
     academic_score = models.FloatField(
         default=0,
         validators=[MinValueValidator(0), MaxValueValidator(100)]
     )
     #Weighted total - auto-computed, never set manually
     score = models.FloatField(default=0)
+    # Letter representation of the score (A-F)
     grade_letter = models.CharField(max_length=5, blank=True)
+    # Determines whether students can view the grade
     published = models.BooleanField(default=False)
+    # Timestamp when the grade record was generated
     computed_at = models.DateTimeField(auto_now_add=True)
+    # Additional grading remarks
     remarks = models.TextField(blank=True)
 
     def compute_weighted_score(self):
@@ -292,11 +346,16 @@ class LogReview(models.Model):
     """
     Stores supervisor reviews of weekly internship logs.
     """
+    # Weekly log being reviewed
     log = models.ForeignKey(WeeklyLog, on_delete = models.CASCADE, related_name='reviews')  
+    # Supervisor responsible for the review
     supervisor = models.ForeignKey(User, on_delete = models.SET_NULL, null = True, related_name = 'log_reviews')
+    # Review outcome (Approved or Rejected)
     decision = models.CharField(max_length = 20, choices= [('Approved', 'Approved'),('Rejected', 'Rejected')]
-                                )      
+                                )     
+    # Supervisor feedback regarding the log 
     comment = models.TextField(blank = True)
+    # Timestamp of review completion
     reviewed_at = models.DateTimeField(auto_now_add = True)
     def __str__(self):
         return f"Review of Log# {self.log_id} by {self.supervisor} - {self.decision}"
@@ -306,9 +365,13 @@ class Notification(models.Model):
     """
     Stores system-generated notifications delivered to users.
     """
+    # User receiving the notification
     recipient = models.ForeignKey(User, on_delete = models.CASCADE, related_name = 'notifications')
+    # Notification content
     message = models.TextField()
+    # Indicates whether the notification has been read
     is_read = models.BooleanField(default=False)
+    # Notification creation timestamp
     created_at = models.DateTimeField(auto_now_add=True)
     class Meta:
         ordering = ['-created_at']
@@ -319,10 +382,14 @@ class Flag(models.Model):
     """
     Stores issues or concerns raised against a student during internship.
     """
+    # Student against whom the concern is raised
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='flags', limit_choices_to={'role':'STUDENT'}
                                )
+    # User who reported the concern
     raised_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='raised_flags')
+    # Description of the issue or concern
     reason = models.TextField()
+    # Timestamp when the flag was created
     created_at = models.DateTimeField(auto_now_add=True)
     def __str__(self):
         return f"Flag on {self.student.username} by {self.raised_by}"
