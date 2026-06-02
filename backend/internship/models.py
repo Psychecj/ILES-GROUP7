@@ -47,10 +47,11 @@ class User(AbstractUser):
 
 
 class WeeklyLog(models.Model):
-    """A single weekly internship log entry.
+    """
+    Stores weekly internship reports submitted by students.
 
-    Records what a student worked on in a given week and where that log is in the
-    review or approval workflow.
+    Each log captures the student's activities, hours worked,
+    skills acquired, challenges faced, attachments, and review status.
     """
 
     # Which student this log belongs to.
@@ -109,6 +110,12 @@ class WeeklyLog(models.Model):
         ordering = ['week']
     
 class EvaluationForm(models.Model):
+    """
+    Stores supervisor evaluations of student internship performance.
+
+    Evaluations assess technical skills, communication ability,
+    punctuality, and overall performance.
+    """
     placement = models.ForeignKey('Placement', on_delete=models.CASCADE, related_name='evaluations')
     submitted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='submitted_evaluations')    
     technical_skills = models.IntegerField(
@@ -217,6 +224,12 @@ class Placement(models.Model):
         super().save(*args, **kwargs) 
 
 class FinalGrade(models.Model):
+    """
+    Stores the final internship grade for a placement.
+
+    Grades are automatically calculated from workplace
+    supervisor evaluations and mapped to a letter grade.
+    """
     placement = models.OneToOneField(Placement, on_delete=models.CASCADE, related_name='final_grade')
     computed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='computed_grades')
     academic_score = models.FloatField(
@@ -276,6 +289,9 @@ class FinalGrade(models.Model):
         
 
 class LogReview(models.Model):
+    """
+    Stores supervisor reviews of weekly internship logs.
+    """
     log = models.ForeignKey(WeeklyLog, on_delete = models.CASCADE, related_name='reviews')  
     supervisor = models.ForeignKey(User, on_delete = models.SET_NULL, null = True, related_name = 'log_reviews')
     decision = models.CharField(max_length = 20, choices= [('Approved', 'Approved'),('Rejected', 'Rejected')]
@@ -287,6 +303,9 @@ class LogReview(models.Model):
     
 
 class Notification(models.Model):
+    """
+    Stores system-generated notifications delivered to users.
+    """
     recipient = models.ForeignKey(User, on_delete = models.CASCADE, related_name = 'notifications')
     message = models.TextField()
     is_read = models.BooleanField(default=False)
@@ -297,6 +316,9 @@ class Notification(models.Model):
         return f"Notification for {self.recipient.username}: {self.message[:40]}"
         
 class Flag(models.Model):
+    """
+    Stores issues or concerns raised against a student during internship.
+    """
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='flags', limit_choices_to={'role':'STUDENT'}
                                )
     raised_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='raised_flags')
