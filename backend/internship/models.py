@@ -20,10 +20,13 @@ from .constants import (ROLE_CHOICES, LOG_STATUSES,
 from django.core.exceptions import ValidationError as DjangoValidationError
 
 class User(AbstractUser):
-    """Custom user model.
+    """
+    Custom user model extending Django's AbstractUser.
 
-    We add a `role` field to the standard Django user so the rest of the app can
-    branch behavior (permissions, dashboards, workflows) based on user type.
+    This model provides role-based access control for the internship
+    management system. Every user belongs to one of the predefined
+    roles such as Student, Workplace Supervisor, Academic Supervisor,
+    or Internship Administrator.
     """
     #first im ensuring the email is uniques and can be used for login
     email = models.EmailField(unique=True)
@@ -147,17 +150,40 @@ def validate_transition(current_status, new_status, valid_transitions):
         raise InvalidStateError(f"canot transition from {current_status} to {new_status} \n Allowed: {allowed}")
     
 class Placement(models.Model):
+    """
+    Represents a student's internship placement.
+    
+    Stores information about the company, internship period,
+    assigned supervisors, and placement status.
+    """
+    
+    #student undertaking the internship 
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='placements', limit_choices_to={'role':'STUDENT'} )
     workplace_supervisor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='supervised_placements', limit_choices_to={'role':'WORKPLACE_SUPERVISOR'})
     academic_supervisor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='academic_supervised_placements', limit_choices_to={'role':'ACADEMIC_SUPERVISOR'}) 
+    
+    #name of the internship company/organization  
     company_name = models.CharField(max_length=255)
+    
+    #internship commencenment date  
     start_date = models.DateField(null=True, blank=True)
+    
+    #internship completion date  
     end_date = models.DateField(null=True, blank=True)
+    
+    #current worlflow status of the placement  
     status = models.CharField(max_length=20, choices=PLACEMENT_STATUSES, default='Pending')
+    
+    #timestamp of when the placement record was recorded in the system
     created_at = models.DateTimeField(auto_now_add=True)
+    
     #deadline enforcemennt
     deadline = models.DateField(null=True, blank=True)
+    
+    #physical address of the workplace, optional but can be useful for record-keeping and reporting
     address = models.CharField(max_length=500, blank=True)
+    
+    #internship administrator who approved the placement  
     approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_placements', limit_choices_to={'role': 'INTERNSHIP_ADMIN'})
     
 
