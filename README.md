@@ -1,8 +1,8 @@
-# ILES - Internship Lifecycle and Evaluation System
+# ILES - Internship Logging and Evaluation System
 
 ## Overview
 
-ILES (Internship Lifecycle and Evaluation System) is a web-based platform designed to manage and monitor student internships. The system provides a centralized environment where students, workplace supervisors, academic supervisors, and administrators can collaborate throughout the internship period.
+ILES (Internship Logging and Evaluation System) is a web-based platform designed to manage and monitor student internships. The system provides a centralized environment where students, workplace supervisors, academic supervisors, and administrators can collaborate throughout the internship period.
 
 The platform supports internship placement management, weekly activity logging, performance evaluation, supervisor reviews, grading, and communication among stakeholders.
 
@@ -154,4 +154,4 @@ npm run dev
 
 Group 7
 
-Internship Lifecycle and Evaluation System (ILES)
+Internship Logging and Evaluation System (ILES)
