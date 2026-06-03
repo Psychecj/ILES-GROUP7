@@ -147,3 +147,7 @@ export const createFlag = (data) => apiFetch('/flags/', {
 
 export const publishGrade = (id) =>
 apiFetch(`/grades/${id}/publish/`, { method: 'POST' });
+
+// Add a "wake up" ping when the app loads
+export const pingServer = () => 
+  fetch(`${BASE_URL}/login/`, { method: 'GET' }).catch(() => {});
