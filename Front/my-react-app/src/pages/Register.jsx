@@ -36,22 +36,23 @@ function Register() {
     setError("");
     setSuccess(""); // When user clicks "Sign Up", this runs. First, set loading to true (show disabled button) and clear any prev success/error messages.
 
+    if (form.password.length < 8) {
+      setError("Password must be at least 8 characters long.");
+      setLoading(false);
+      return;
+    }// Check if password is at least 8 characters. If not, show error, stop loading, exit early.
+
     if (form.password !== form.confirmPassword) {
       setError("Passwords do not match.");
       setLoading(false);
       return;
     } // Check if password and confirm password match. If not, show error, stop loading, exit early – do not send to backend.
 
-    if (form.password.length < 8) {
-      setError("Password must be at least 8 characters long.");
-      setLoading(false);
-      return;
-    }
-      // Check if password is at least 8 characters. If not, show error, stop loading, exit early.
+    
     {form.password.length > 0 && form.password.length < 8 && (
      <p className="password-hint">Password must be at least 8 characters ({form.password.length}/8)</p>
     )} {/* This is a real-time hint below the password field that shows how many characters have been typed. It only appears once the user starts typing (length > 0) and disappears once they reach 8 characters. */}  
-    
+
     try {
       const data = await registerUser({
         username: form.username,
@@ -106,6 +107,16 @@ function Register() {
           className="auth-input"
           onChange={handleChange}
         />
+        
+    
+        
+        {form.password.length > 0 && form.password.length < 8 && (
+        <p className="password-hint">
+        Password must be at least 8 characters ({form.password.length}/8)
+        </p>
+        )} {/* This is a real-time hint below the password field that shows how many characters have been typed. It only appears once the user starts typing (length > 0) and disappears once they reach 8 characters. */}  
+
+
 
         <input
           name="confirmPassword"
