@@ -1,19 +1,55 @@
+"""
+serializers.py — Django REST Framework serializers for the internship app.
+ 
+Serializers sit between the database models and the API.
+They do two things:
+  1. OUTPUT  — convert a model object into JSON so the frontend can read it.
+  2. INPUT   — validate and clean JSON sent by the frontend before saving to the DB.
+ 
+Each serializer maps to one model in models.py.
+"""
+
+
 from rest_framework import serializers
 from .models import User, Placement, WeeklyLog, EvaluationForm, FinalGrade, LogReview, Notification, Flag
 
 class RegisterSerializer(serializers.ModelSerializer):
+    """
+    Handles new user registration.
+ 
+    Accepts username, email, password, confirm_password, and role.
+    Passwords are write-only — they are never sent back in a response.
+    """
+    
+    # min_length=8 enforces the 8-character password rule at the API level
     password = serializers.CharField(write_only=True, min_length=8)
+    # A second password field used only to confirm the user typed the same thing twice
     confirm_password = serializers.CharField(write_only=True)
     class Meta:
         model = User
+        # These are the only fields accepted during registration
         fields = ['username', 'email', 'password', 'confirm_password', 'role']
     def validate(self, data):
+        """
+        Cross-field validation: checks that password and confirm_password match.
+ 
+        `data` is a dictionary of all submitted fields.
+        Raises a ValidationError if the two passwords differ,
+        which sends a 400 Bad Request back to the frontend.
+        """
         if data['password'] != data['confirm_password']:
             raise serializers.ValidationError(
                      {"confirm password": "Passwords do not match."}
                     )
         return data
     def create(self, validated_data):
+            """
+            Creates and saves a new User after validation passes.
+ 
+            confirm_password is removed first because the User model
+            does not have that field — it was only needed for validation.
+            create_user() hashes the password before storing it (never plain text).
+            """
             validated_data.pop('confirm_password')  # Remove confirm_password before creating the user
             return User.objects.create_user(
                 username=validated_data['username'],
@@ -24,19 +60,41 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 #first the users serializer
 class UserSerializer(serializers.ModelSerializer):
+    """
+    Converts a User object into JSON for API responses.
+ 
+    Used as a nested serializer inside other serializers
+    (e.g. showing full student details inside a placement response).
+    Password is intentionally excluded — never expose it in a response.
+    """
     class Meta: #this is an inner class i use to provide meta data or configuration data about the main class
         model = User
+        # Only safe, non-sensitive fields are included
         fields = ['id','username','email','role','profile_picture']
 
-        #im not including the password fied coz this would expose it 
+        #im not including the password field coz this would expose it 
 
 #now the placement serializer
 class PlacementSerializer(serializers.ModelSerializer):
-    #ive decided to craerte a readonly nested under the user info so front end gets names not just ids
+    """
+    Handles reading and writing of Placement records.
+ 
+    Uses a dual read/write pattern for related users:
+    - READ  → returns a full nested object (e.g. student's name, email, role)
+    - WRITE → accepts just an integer ID (e.g. student_id: 5)
+ 
+    This way the frontend receives rich data but only needs to send an ID when creating.
+    """
+ 
+    # READ-ONLY nested objects — returned in GET responses
+    #ive decided to create a read only nested under the user info so frontend gets names not just ids
     student = UserSerializer(read_only=True) 
     workplace_supervisor = UserSerializer(read_only=True)
     academic_supervisor = UserSerializer(read_only=True)
 
+
+    # WRITE-ONLY ID fields — accepted in POST/PUT/PATCH requests
+    # source='student' tells DRF to map student_id onto the student field of the model
     #and i have decide to alllow ids to be writeonly to be used when creating and updating
     #write and read help us send a simple id such as std and receive back to the frontend a full object wit std details
     student_id = serializers.PrimaryKeyRelatedField(
@@ -46,19 +104,34 @@ class PlacementSerializer(serializers.ModelSerializer):
 
     workplace_supervisor_id = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.filter(role='WORKPLACE_SUPERVISOR'), 
-        write_only = True, source = 'workplace_supervisor', required=False
+        write_only = True, source = 'workplace_supervisor', required=False # Not mandatory when creating a placement
     )
 
     academic_supervisor_id = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.filter(role='ACADEMIC_SUPERVISOR'),
-        write_only=True, source='academic_supervisor', required=False, allow_null=True
+        write_only=True, source='academic_supervisor', required=False, allow_null=True # Can be left unassigned
     )
 
     class Meta:
         model = Placement
-        fields = '__all__'
+        fields = '__all__' # Include every field from the Placement model
 
     def validate(self, data):
+        """
+        Business-rule validation for placement dates.
+ 
+        Two checks are performed:
+        1. End date must be after start date.
+        2. The student must not already have an active/pending placement
+           whose dates overlap with the new one.
+ 
+        Overlap logic: two ranges [A_start, A_end] and [B_start, B_end]
+        overlap when A_start <= B_end AND A_end > B_start.
+ 
+        self.instance is set when updating an existing record (PUT/PATCH),
+        and None when creating a new one (POST). We exclude the current
+        record from the overlap check so an update doesn't conflict with itself.
+        """
         """
         Prevent a student from having two placements with overlapping date ranges.
         Runs errors saving - raises ValidateError if overlap detected.

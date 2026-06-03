@@ -48,6 +48,7 @@ export default function StudentDashboard() {
   }, []);
 
     //runs once when the page loads
+    //if login takes more than 4 seconds, the button text changes to let the user know it's not frozen — it's just the server starting up"
     useEffect(() => {
       getNotifications().then(setNotifications).catch(() => {});
     }, []);
