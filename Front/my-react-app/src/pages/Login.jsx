@@ -21,6 +21,14 @@ function Login() {                               // component (login)
     setLoading(true);   //show loading state
     setError("");       //clears previous errors
 
+    
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters long.");
+      setLoading(false);
+      return;
+     } // Check if password is at least 8 characters. If not, show error, stop loading, exit early – do not send to backend.
+
+
     try {               //try, this is used to handle any errors I can think of that might happen during Login process, they will be caught in catch block.
       const data = await loginUser({email, password, role}); // data is response from backend after sent login request by functionLoginUser, await waits for task of LoginUser to finish then go to nxt code line.
       if (!data.success){ 
