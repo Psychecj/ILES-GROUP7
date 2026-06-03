@@ -143,11 +143,14 @@ class PlacementSerializer(serializers.ModelSerializer):
         end_date = data.get('end_date')
         #Basic date order check    
             
+        # Check 1: date order    
         if start_date and end_date and start_date >=end_date:
             raise serializers.ValidationError({
                     "end_date": "End date must be after start date."
                  })
+        # Check 2: overlapping placements for the same student    
         if student and start_date and end_date:
+        # When updating, exclude the placement being edited from the overlap search    
         #Exclude the current instance when updating (not just creating)
             instance_id = self.instance.id if self.instance else None 
             overlapping = Placement.objects.filter(
@@ -171,6 +174,16 @@ class PlacementSerializer(serializers.ModelSerializer):
 
 
 class WeeklyLogSerializer(serializers.ModelSerializer):
+    """
+    Handles reading and writing of WeeklyLog records.
+ 
+    The student field is a read-only nested object so responses
+    include the student's name and role, not just their ID.
+ 
+    read_only_fields prevents the frontend from overriding
+    system-managed fields like status, timestamps, and the student link —
+    those are set by the backend, not the user.
+    """
     student = UserSerializer(read_only=True)
 
     class Meta:
@@ -180,6 +193,14 @@ class WeeklyLogSerializer(serializers.ModelSerializer):
 
 #now eavluation form seri
 class EvaluationFormSerializer(serializers.ModelSerializer):
+    """
+    Handles reading and writing of EvaluationForm records.
+ 
+    submitted_by is read-only so supervisors cannot impersonate
+    each other — the backend assigns it automatically from the
+    logged-in user in the view.
+    """
+    # Read-only nested object: responses show full supervisor details, not just an ID
     submitted_by = UserSerializer(read_only=True)
 
     class Meta:
@@ -191,11 +212,26 @@ class EvaluationFormSerializer(serializers.ModelSerializer):
 
 #finally final grade serializers 
 class FinalGradeSerializer(serializers.ModelSerializer):
+    """
+    Serializes FinalGrade records for API responses.
+ 
+    The score and grade_letter are auto-computed in the model's
+    save() method, so the frontend only reads them — never writes them.
+    """
     class Meta:
         model = FinalGrade 
         fields = '__all__'
 
 class LogReviewSerializer(serializers.ModelSerializer):
+    """
+    Handles reading and writing of LogReview records.
+ 
+    supervisor is read-only — the backend assigns it from
+    the logged-in user, preventing supervisors from reviewing
+    under someone else's name.
+    """
+ 
+    # Nested read-only: responses include the supervisor's full details
     supervisor = UserSerializer(read_only=True)
 
     class Meta:
@@ -204,12 +240,26 @@ class LogReviewSerializer(serializers.ModelSerializer):
         read_only_fields = ['supervisor', 'reviewed_at']  
 
 class NotificationSerializer(serializers.ModelSerializer):
+    """
+    Serializes Notification records sent to users.
+ 
+    recipient and created_at are read-only — notifications
+    are created by the system, not manually submitted by users.
+    """
     class Meta:
         model = Notification
         fields = '__all__'
         read_only_fields = ['recipient', 'created_at']
 
 class FlagSerializer(serializers.ModelSerializer):
+    """
+    Handles reading and writing of Flag records.
+ 
+    raised_by is read-only — assigned automatically from
+    the logged-in user so flags cannot be falsely attributed.
+    """
+ 
+    # Nested read-only: responses show who raised the flag
     raised_by = UserSerializer(read_only=True)
 
     class Meta:
