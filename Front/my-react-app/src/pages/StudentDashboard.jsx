@@ -47,7 +47,11 @@ export default function StudentDashboard() {
     fetchGrade();
   }, []);
 
-  getNotifications().then(setNotifications).catch(() => {});
+    //runs once when the page loads
+    useEffect(() => {
+      getNotifications().then(setNotifications).catch(() => {});
+    }, []);
+
     const unread = notifications.filter(n => !n.is_read).length;
     const handleNotifClick = async (id) => {
     await markNotificationRead(id);
