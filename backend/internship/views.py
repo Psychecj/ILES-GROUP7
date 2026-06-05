@@ -55,13 +55,13 @@ class PlacementListView(APIView):
         else:
             qs = Placement.objects.all()
         return Response(PlacementSerializer(qs, many=True).data)
-
-    def post(self, request): #now here the admin creates a palcement
+    #this is where the admin creates a placement and assigns the student and supervisors/CHANGED
+    """def post(self, request): #now here the admin creates a palcement
         s = PlacementSerializer(data=request.data)
         if s.is_valid():
             s.save()
             return Response(s.data,status=status.HTTP_201_CREATED)
-        return Response(s.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(s.errors, status=status.HTTP_400_BAD_REQUEST)"""
     def post(self, request):
         if request.user.role != 'INTERNSHIP_ADMIN':
             return Response({'error':'Admin Only'}, status=403)
