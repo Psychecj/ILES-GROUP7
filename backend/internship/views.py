@@ -62,6 +62,14 @@ class PlacementListView(APIView):
             s.save()
             return Response(s.data,status=status.HTTP_201_CREATED)
         return Response(s.errors, status=status.HTTP_400_BAD_REQUEST)
+    def post(self, request):
+        if request.user.role != 'INTERNSHIP_ADMIN':
+            return Response({'error':'Admin Only'}, status=403)
+        s = PlacementSerializer(data=request.data)
+        if s.is_valid():
+            placement = s.save(approved_by=request.user)
+            return Response(PlacementSerializer(placement).data, status=status.HTTP_201_CREATED)
+        return Response(s.errors, status=status.HTTP_400_BAD_REQUEST)
     
 class PlacementDetailView(APIView):
     permission_classes = [IsAuthenticated]
