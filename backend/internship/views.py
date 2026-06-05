@@ -29,6 +29,7 @@ class LoginView(APIView):
     def post(self, request):
         email = request.data.get('email','')
         password = request.data.get('password','')
+        requested_role = request.data.get('role')
 
         result = login_user(email, password)
 
@@ -38,6 +39,12 @@ class LoginView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED #this is what is shown to a suser we dont confirm after entering thir creds
 
             )
+        if requested_role and result['user']['role'] != requested_role:
+            return Response(
+                {'message': 'This account does not belong to the selected role'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         return Response(result, status=status.HTTP_200_OK) #200 will mean everything good the credentials match
     
 #now the placement, weeklog and eavl end points
@@ -491,7 +498,8 @@ class UserListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        if request.user.role != 'INTERNSHIP_ADMIN':
+            return Response({'error':'Only internship admins can list users'}, status=403)
         role = request.query_params.get('role')
-        if role:
-            qs = User.objects.filter(role=role)
+        qs = User.objects.filter(role=role) if role else User.objects.all()
         return Response(UserSerializer(qs, many=True).data)

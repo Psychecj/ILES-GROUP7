@@ -26,6 +26,7 @@ def login_user(email,password):
         'refresh_token': str(refresh), # this is the one that allows the user to stay logged in
         'user': {
             'id': user.id,
+            'username': user.username,
             'email': user.email,
             'role': user.role,
         }
