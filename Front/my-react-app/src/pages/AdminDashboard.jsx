@@ -1,21 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getUser, logOut, getPlacements, updatePlacement, createPlacement, publishGrade } from '../services/api';
+import { getUser, logOut, getPlacements, updatePlacement, createPlacement } from '../services/api';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import './AdminDashboard.css';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const user = getUser();
 
   const [placements, setPlacements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [stats, setStats] = useState(null);
-  const [students, setStudents] = useState([]);
-  const [wps, setWps] = useState([]);
-  const [academics, setAcademics] = useState([]);
 
-  // Create placement form state
   const [showForm, setShowForm] = useState(false);
   const [formMsg, setFormMsg] = useState('');
   const [newPlacement, setNewPlacement] = useState({
@@ -32,8 +29,6 @@ export default function AdminDashboard() {
       .then((data) => {
         const placementsArray = data.results ?? data;
         setPlacements(placementsArray);
-
-        // Compute stats for pie chart
         if (Array.isArray(placementsArray)) {
           const pending = placementsArray.filter(p => p.status === 'Pending').length;
           const active = placementsArray.filter(p => p.status === 'Active').length;
@@ -49,29 +44,12 @@ export default function AdminDashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-
-  useEffect(() => {
-    getUsers('STUDENT').then(setStudents);
-    getUsers('WORKPLACE_SUPERVISOR').then(setWps);
-    getUsers('ACADEMIC_SUPERVISOR').then(setAcademics);
-  }, []);
-
-  const handlePublish = async (gradeId) => {
-  try {
-  await publishGrade(gradeId);
-  setFormMsg('Grade published successfully!');
-  } catch (err) { setFormMsg('Error: ' + err.message); }
-  };
-
-  const getUsers = (role) => apiFetch(`/users/${role ? '?role='+role : ''}`)
-
   const handleActivate = (id) => {
     updatePlacement(id, { status: 'Active' })
       .then(() => {
         setPlacements((prev) =>
           prev.map((p) => (p.id === id ? { ...p, status: 'Active' } : p))
         );
-        // Update stats after activation
         setStats(prev => {
           if (!prev) return prev;
           return {
@@ -97,7 +75,6 @@ export default function AdminDashboard() {
     try {
       const created = await createPlacement(newPlacement);
       setPlacements(prev => [created, ...prev]);
-      // Update stats (add to pending count)
       setStats(prev => {
         if (!prev) return { pending: 1, active: 0, completed: 0, rejected: 0 };
         return { ...prev, pending: prev.pending + 1 };
@@ -162,7 +139,9 @@ export default function AdminDashboard() {
   return (
     <div className="ad-root">
       <div className="ad-header">
-        <h1 className="ad-title">Admin Dashboard</h1>
+        <h1 className="ad-title">
+          Welcome, {user?.username || user?.email?.split('@')[0] || "Admin"} — Admin Dashboard
+        </h1>
         <button className="ad-logout" onClick={handleLogout}>Logout</button>
       </div>
 
@@ -235,13 +214,6 @@ export default function AdminDashboard() {
                       Set Active
                     </button>
                   )}
-                </td>
-                <td>
-                  {p.final_grade && !p.final_grade.published && (
-                  <button onClick={() => handlePublish(p.final_grade.id)}>
-                    Publish Grade
-                  </button>
-                )}
                 </td>
               </tr>
             ))}

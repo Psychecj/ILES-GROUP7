@@ -1,7 +1,7 @@
-import { useState } from 'react'; // useState lets us store form data, loading state, errors, etc.
-import { useNavigate, Link } from 'react-router-dom'; // useNavigate redirects user after success, Link is for linking to login page
-import { registerUser } from '../services/api'; // connecting to api to send sign-up data to the backend
-import './Register.css'; // has my design styles for this page
+import { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { registerUser } from '../services/api';
+import './Register.css';
 
 function Register() {
   const [form, setForm] = useState({
@@ -16,42 +16,26 @@ function Register() {
   const [success, setSuccess] = useState("");
   const navigate = useNavigate();
 
-  /* form is an object that holds all input field values. Initially empty except role defaults to student.
-     setForm - the function to update form when user types
-     loading - becomes 'true' while request is happening, disables the button.
-     error - stores any error message from the backend.
-     success - stores success message after registration.
-     navigate - the function to go to another page (e.g., login) */
-
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
-  /* this is a helper function to handle input changes. Every time user types it runs.
-     e.target.name is the name attribute of the input (like "username").
-     We create a new object, copy all existing form data, then update the one field that changed.
-     This is the standard way to update an object in React state. */
 
   const handleRegister = async () => {
     setLoading(true);
     setError("");
-    setSuccess(""); // When user clicks "Sign Up", this runs. First, set loading to true (show disabled button) and clear any prev success/error messages.
+    setSuccess("");
 
     if (form.password.length < 8) {
       setError("Password must be at least 8 characters long.");
       setLoading(false);
       return;
-    }// Check if password is at least 8 characters. If not, show error, stop loading, exit early.
+    }
 
     if (form.password !== form.confirmPassword) {
       setError("Passwords do not match.");
       setLoading(false);
       return;
-    } // Check if password and confirm password match. If not, show error, stop loading, exit early – do not send to backend.
-
-    
-    {form.password.length > 0 && form.password.length < 8 && (
-     <p className="password-hint">Password must be at least 8 characters ({form.password.length}/8)</p>
-    )} {/* This is a real-time hint below the password field that shows how many characters have been typed. It only appears once the user starts typing (length > 0) and disappears once they reach 8 characters. */}  
+    }
 
     try {
       const data = await registerUser({
@@ -60,12 +44,12 @@ function Register() {
         password: form.password,
         confirmPassword: form.confirmPassword,
         role: form.role,
-      }); // Send the form data to backend using registerUser from api.js. We await the response because we need to know if it was successful before updating the UI.
+      });
 
       if (!data.success) {
         setError(data.errors?.email?.[0] || data.errors?.username?.[0] || "Registration failed");
         return;
-      } // If the backend returns "success: false", there was an error (e.g., email already exists). Show the first error message from errors.email or errors.username, otherwise a generic message.
+      }
 
       setSuccess("Account created! Redirecting to login...");
       setTimeout(() => navigate("/"), 1500);
@@ -73,7 +57,7 @@ function Register() {
       setError(err.message || "Something went wrong");
     } finally {
       setLoading(false);
-    } // If all is well, show success message. After 1.5s, redirect to login page (/). If network error happens, show error message. Finally turn off loading (so button becomes enabled again).
+    }
   };
 
   return (
@@ -85,46 +69,70 @@ function Register() {
         {error && <p className="error-msg">{error}</p>}
         {success && <p className="success-msg">{success}</p>}
 
-        <input
-          name="username"
-          placeholder="Username"
-          className="auth-input"
-          onChange={handleChange}
-        />
+        {/* Username field */}
+        <div className="field-wrap">
+          <input
+            name="username"
+            placeholder="Username"
+            className="auth-input"
+            onChange={handleChange}
+            title="Choose a username for your account"
+            aria-describedby="register-username-help"
+          />
+          <small id="register-username-help" className="field-hint">
+            Your username will be shown on your dashboard.
+          </small>
+        </div>
 
-        <input
-          name="email"
-          type="email"
-          placeholder="Email"
-          className="auth-input"
-          onChange={handleChange}
-        />
+        {/* Email field */}
+        <div className="field-wrap">
+          <input
+            name="email"
+            type="email"
+            placeholder="Email"
+            className="auth-input"
+            onChange={handleChange}
+            title="Enter your valid email address"
+            aria-describedby="register-email-help"
+          />
+          <small id="register-email-help" className="field-hint">
+            We'll use this for login and password reset.
+          </small>
+        </div>
 
-        <input
-          name="password"
-          type="password"
-          placeholder="Password"
-          className="auth-input"
-          onChange={handleChange}
-        />
-        
-    
-        
-        {form.password.length > 0 && form.password.length < 8 && (
-        <p className="password-hint">
-        Password must be at least 8 characters ({form.password.length}/8)
-        </p>
-        )} {/* This is a real-time hint below the password field that shows how many characters have been typed. It only appears once the user starts typing (length > 0) and disappears once they reach 8 characters. */}  
+        {/* Password field with required length hint */}
+        <div className="field-wrap">
+          <input
+            name="password"
+            type="password"
+            placeholder="Password"
+            className="auth-input"
+            onChange={handleChange}
+            minLength="8"
+            title="Password must be at least 8 characters long."
+            aria-describedby="register-password-help"
+          />
+          <small id="register-password-help" className="field-hint">
+            Password must be 8 or more characters.
+          </small>
+        </div>
 
-
-
-        <input
-          name="confirmPassword"
-          type="password"
-          placeholder="Confirm Password"
-          className="auth-input"
-          onChange={handleChange}
-        />
+        {/* Confirm Password field */}
+        <div className="field-wrap">
+          <input
+            name="confirmPassword"
+            type="password"
+            placeholder="Confirm Password"
+            className="auth-input"
+            onChange={handleChange}
+            minLength="8"
+            title="Re-enter your password to confirm"
+            aria-describedby="register-confirm-help"
+          />
+          <small id="register-confirm-help" className="field-hint">
+            Must match your password exactly.
+          </small>
+        </div>
 
         <select name="role" value={form.role} className="auth-input" onChange={handleChange}>
           <option value="STUDENT">Student</option>

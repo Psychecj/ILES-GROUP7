@@ -11,7 +11,7 @@ export default function AcademicSupervisorDashboard() {
   const [evaluations, setEvaluations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [gradeForm, setGradeForm] = useState({ placement: '', academic_score: '', remarks: '' });
+  const [gradeForm, setGradeForm] = useState({ score: '', remarks: '' });
   const [gradeMsg, setGradeMsg] = useState('');
   const [activePlacementId, setActivePlacementId] = useState(null);
 
@@ -44,12 +44,17 @@ export default function AcademicSupervisorDashboard() {
     setGradeForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleGradeSubmit = async () => {
+  const handleGradeSubmit = async (placementId) => {
     try {
-      await createGrade(gradeForm);
+      const payload = {
+        placement: placementId,
+        academic_score: Number(gradeForm.score),
+        remarks: gradeForm.remarks
+      };
+      await createGrade(payload);
       setGradeMsg('Grade submitted successfully!');
       setActivePlacementId(null);
-      setGradeForm({ placement: placementId, score: '', remarks: '' });
+      setGradeForm({ score: '', remarks: '' });
       const data = await getGrades();
       setGrades(data.results ?? data);
       setTimeout(() => setGradeMsg(''), 3000);
@@ -59,7 +64,6 @@ export default function AcademicSupervisorDashboard() {
     }
   };
 
-  // Prepare chart data: average of evaluation scores
   const getChartData = () => {
     if (!evaluations.length) return [];
     const avgTech = evaluations.reduce((sum, e) => sum + (e.technical_skills || 0), 0) / evaluations.length;
@@ -88,7 +92,9 @@ export default function AcademicSupervisorDashboard() {
         <button className='as-logout' onClick={handleLogout}>Logout</button>
       </aside>
       <main className='as-main'>
-        <h1 className='as-title'>Academic Supervisor Dashboard</h1>
+        <h1 className='as-title'>
+          Welcome, {user?.username || user?.email?.split('@')[0] || "Academic Supervisor"}
+        </h1>
         {gradeMsg && <div className='as-success'>{gradeMsg}</div>}
 
         {placements.map(p => {
@@ -114,7 +120,6 @@ export default function AcademicSupervisorDashboard() {
                   <p><strong>Final Score:</strong> {g.score}/100 ({g.grade_letter})</p>
                   <p><strong>Academic Score:</strong> {g.academic_score}</p>
                   <p><strong>Published:</strong> {g.published ? 'Yes' : 'No'}</p>
-                  
                   <p><strong>Remarks:</strong> {g.remarks}</p>
                 </div>
               ))}
@@ -141,9 +146,8 @@ export default function AcademicSupervisorDashboard() {
                         onChange={handleGradeChange}
                         rows='2'
                       />
-                      <input type='hidden' name='placement' value={p.id} />
                       <div className='as-grade-actions'>
-                        <button onClick={handleGradeSubmit(p.id)}>Submit Grade</button>
+                        <button onClick={() => handleGradeSubmit(p.id)}>Submit Grade</button>
                         <button onClick={() => setActivePlacementId(null)}>Cancel</button>
                       </div>
                     </div>
@@ -154,7 +158,6 @@ export default function AcademicSupervisorDashboard() {
           );
         })}
 
-        {/* Bar chart for average evaluation scores */}
         {getChartData().length > 0 && (
           <div className='as-chart-box'>
             <h3>Evaluation Scores Overview (Average across all students)</h3>

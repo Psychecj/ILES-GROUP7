@@ -63,21 +63,38 @@ function Login() {
 
         {error && <p className="error-message">{error}</p>}
 
-        <input
-          className="input-field"
-          type="text"
-          value={email}
-          placeholder="Email"
-          onChange={(e) => setEmail(e.target.value)}
-        />
+        {/* Email field */}
+        <div className="field-wrap">
+          <input
+            className="input-field"
+            type="text"
+            value={email}
+            placeholder="Email"
+            onChange={(e) => setEmail(e.target.value)}
+            title="Enter your registered email address"
+            aria-describedby="login-email-help"
+          />
+          <small id="login-email-help" className="field-hint">
+            Use the email you registered with.
+          </small>
+        </div>
 
-        <input
-          className="input-field"
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+        {/* Password field with hint */}
+        <div className="field-wrap">
+          <input
+            className="input-field"
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            minLength="8"
+            title="Password must be at least 8 characters long."
+            aria-describedby="login-password-help"
+          />
+          <small id="login-password-help" className="field-hint">
+            Password must be 8 or more characters.
+          </small>
+        </div>
 
         <select
           value={role}

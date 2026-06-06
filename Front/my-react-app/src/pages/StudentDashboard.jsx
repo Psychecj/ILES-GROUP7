@@ -293,7 +293,9 @@ export default function StudentDashboard() {
       <main className="sd-main">
         <header className="sd-header">
           <div>
-            <h1 className="sd-welcome">Welcome back, {user?.email || "Student"} 👋</h1>
+            <h1 className="sd-welcome">
+           Welcome back, {user?.username || user?.email?.split('@')[0] || "Student"} 👋
+            </h1>
             <p className="sd-subtitle">Internship Logging & Evaluation System</p>
           </div>
           <button
