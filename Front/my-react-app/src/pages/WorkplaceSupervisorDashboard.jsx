@@ -42,14 +42,16 @@ export default function WorkplaceSupervisorDashboard() {
   };
 
   const handleReview = async (logId, decision) => {
+    // Convert decision to uppercase to match backend enum (e.g., 'APPROVED' instead of 'Approved')
+    const status = decision.toUpperCase();
     try {
       await updateWeeklyLog(logId, {
-        status: decision,
+        status: status,
         supervisor_comment: comments[logId] || ''
       });
       setLogs(prev => prev.map(l =>
         l.id === logId
-          ? { ...l, status: decision, supervisor_comment: comments[logId] || '' }
+          ? { ...l, status: status, supervisor_comment: comments[logId] || '' }
           : l
       ));
       setComments(prev => { const n = { ...prev }; delete n[logId]; return n; });
@@ -104,7 +106,7 @@ export default function WorkplaceSupervisorDashboard() {
       </aside>
 
       <main className="ws-main">
-        <h1 className="ws-title">Welcome, {user?.email} — Workplace Supervisor</h1>
+        <h1 className="ws-title">Welcome, {user?.username || user?.email?.split('@')[0] || "Supervisor"} — Workplace Supervisor</h1>
         {error && <div className="ws-error">{error}</div>}
 
         {activeTab === 'logs' && (
