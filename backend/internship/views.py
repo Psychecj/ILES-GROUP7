@@ -220,8 +220,8 @@ class EvaluationListView(APIView):
         if s.is_valid():
             eval_obj = s.save(submitted_by=request.user)
             if eval_obj.placement.workplace_supervisor_id != request.user.id:
-                eval_obj.delete{}
-                return Response( ['error': 'This placement is not assigned to you'], status=403)
+                eval_obj.delete()
+                return Response( {'error': 'This placement is not assigned to you'}, status=403)
             eval_obj.change_status('Submitted')
             for admin_user in User.objects.filter(role='INTERNSHIP_ADMIN'):
                 create_notification(
