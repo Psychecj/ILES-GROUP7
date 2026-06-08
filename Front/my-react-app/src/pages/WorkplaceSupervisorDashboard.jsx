@@ -43,7 +43,7 @@ export default function WorkplaceSupervisorDashboard() {
 
   const handleReview = async (logId, decision) => {
     // Convert decision to uppercase to match backend enum (e.g., 'APPROVED' instead of 'Approved')
-    const status = decision.toUpperCase();
+    const status = decision;
     try {
       await updateWeeklyLog(logId, {
         status: status,
@@ -60,14 +60,40 @@ export default function WorkplaceSupervisorDashboard() {
     }
   };
 
+  // 1. Add validateEval function inside the component:
+  const validateEval = () => {
+    if (!evalForm.placement) return 'Please select a placement.';
+      const fields = ['technical_skills', 'communication_skills', 'punctuality'];
+      for (const f of fields) {
+      const v = Number(evalForm[f]);
+      if (isNaN(v) || v < 0 || v > 10)
+        return `${f.replace(/_/g,' ')} must be between 0 and 10.`;
+      }
+    return null; // no error
+    };
+
   const handleEvalChange = (e) => {
     const { name, value } = e.target;
     setEvalForm(prev => ({ ...prev, [name]: value }));
   };
 
   const handleEvalSubmit = async () => {
+    const error = validateEval();
+    if (error) {
+      setEvalMsg(error);
+      setTimeout(() => setEvalMsg(''), 3000);
+      return;
+    }
     try {
-      await createEvaluation(evalForm);
+      await createEvaluation(
+        {
+        ...evalForm,
+        placement: Number(evalForm.placement), // ensure integer
+        technical_skills: Number(evalForm.technical_skills),
+        communication_skills: Number(evalForm.communication_skills),
+        punctuality: Number(evalForm.punctuality),
+      });
+      
       setEvalMsg('Evaluation submitted successfully!');
       setEvalForm({
         placement: '', technical_skills: 5,
@@ -78,6 +104,42 @@ export default function WorkplaceSupervisorDashboard() {
       setEvalMsg('Error: ' + err.message);
     }
   };
+
+  // 1. Add filter state near other state declarations:
+const [logFilter, setLogFilter] = useState('All');
+// 2. Compute filtered list:
+const filteredLogs = logFilter === 'All'
+? logs
+: logs.filter(l => l.status === logFilter);
+// 3. Add the filter UI before the log cards, inside the 'logs' tab section:
+<div style={{ marginBottom: 12 }}>
+<label style={{ marginRight: 8, fontWeight: 600 }}>Filter:</label>
+{['All', 'Submitted', 'Approved', 'Rejected', 'Draft'].map(s => (
+<button
+key={s}
+onClick={() => setLogFilter(s)}
+style={{
+marginRight: 6, padding: '4px 10px', borderRadius: 12,
+border: '1px solid #A0B8D8',
+background: logFilter === s ? '#4A6FA5' : '#F0F4FF',
+color: logFilter === s ? '#fff' : '#333',
+cursor: 'pointer', fontSize: 13,
+}}
+>
+{s}
+</button>
+))}
+</div>
+// 4. Replace 'logs.map' with 'filteredLogs.map' in the JSX.
+// Also guard against undefined status:
+const safeStatus = (log.status || 'draft').toLowerCase();
+// Use safeStatus in className: `ws-status ws-status-${safeStatus}`
+// 5. Show a helpful message when no logs match the filter:
+{filteredLogs.length === 0 && (
+<p style={{ color: '#6C757D', fontStyle: 'italic' }}>
+No {logFilter === 'All' ? '' : logFilter} logs found.
+</p>
+)}
 
   const handleLogout = () => {
     logOut();
@@ -171,7 +233,7 @@ export default function WorkplaceSupervisorDashboard() {
                   <label>{field.replace(/_/g, ' ')}</label>
                   <input type="number" name={field} min="0" max="10"
                     value={evalForm[field]} onChange={handleEvalChange} />
-                  <span>/10</span>
+                  <span style={{ color: '#6C757D', fontSize: 12 }}>/10 (0 - 10)</span>
                 </div>
               ))}
               <label>Overall Comments</label>
