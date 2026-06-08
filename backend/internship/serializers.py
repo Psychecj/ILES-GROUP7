@@ -74,6 +74,23 @@ class UserSerializer(serializers.ModelSerializer):
 
         #im not including the password field coz this would expose it 
 
+#finally final grade serializers
+# MOVED UP: FinalGradeSerializer must be defined before PlacementSerializer
+# because PlacementSerializer references it as a nested field.
+# Python reads top-to-bottom — using a class before it is defined causes a NameError.
+class FinalGradeSerializer(serializers.ModelSerializer):
+    """
+    Serializes FinalGrade records for API responses.
+ 
+    The score and grade_letter are auto-computed in the model's
+    save() method, so the frontend only reads them — never writes them.
+    """
+    class Meta:
+        model = FinalGrade 
+        """fields = '__all__'"""
+        #changed to only return the fields that are needed by the frontend and not all the fields in the model
+        fields = ['id', 'grade_letter', 'academic_score', 'published', 'remarks', 'created_at', 'updated_at']
+
 #now the placement serializer
 class PlacementSerializer(serializers.ModelSerializer):
     """
@@ -160,15 +177,15 @@ class PlacementSerializer(serializers.ModelSerializer):
                 end_date__gt=start_date, #existing ends after new one starts
                 status__in=['Pending', 'Active'] #only check active placements
                 ).exclude(id=instance_id)
-        if overlapping.exists():
-            conflict = overlapping.first()
-            raise serializers.ValidationError({
-                    "start_date": (
-                        f"This student already has a placement at {conflict.company_name}"
-                        f"from {conflict.start_date} to {conflict.end_date}."
-                        f"Dates must not overlap."
-                    )
-                })
+            if overlapping.exists():  # FIXED: was at wrong indent level (outside the if block above)
+                conflict = overlapping.first()
+                raise serializers.ValidationError({
+                        "start_date": (
+                            f"This student already has a placement at {conflict.company_name}"
+                            f"from {conflict.start_date} to {conflict.end_date}."
+                            f"Dates must not overlap."
+                        )
+                    })
         return data 
 
 
@@ -210,20 +227,6 @@ class EvaluationFormSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'submitted_by', 'status', 'submitted_at', 'created_at'
         ]
-
-#finally final grade serializers 
-class FinalGradeSerializer(serializers.ModelSerializer):
-    """
-    Serializes FinalGrade records for API responses.
- 
-    The score and grade_letter are auto-computed in the model's
-    save() method, so the frontend only reads them — never writes them.
-    """
-    class Meta:
-        model = FinalGrade 
-        """fields = '__all__'"""
-        #changed to only return the fields that are needed by the frontend and not all the fields in the model
-        fields = ['id', 'grade_letter', 'academic_score', 'published', 'remarks', 'created_at', 'updated_at']
 
 class LogReviewSerializer(serializers.ModelSerializer):
     """
@@ -269,5 +272,3 @@ class FlagSerializer(serializers.ModelSerializer):
         model = Flag
         fields = '__all__'
         read_only_fields = ['raised_by', 'created_at']
-
-
