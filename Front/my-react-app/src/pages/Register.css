@@ -94,3 +94,22 @@
   text-align: center;
   font-size: 0.875rem;
 }
+
+/* Field wrapper and hint styles for FE-03 */
+.field-wrap {
+  position: relative;
+  margin-bottom: 1rem;
+}
+
+.field-hint {
+  display: none;
+  font-size: 0.75rem;
+  color: #6c757d;
+  margin-top: 0.25rem;
+  line-height: 1.2;
+}
+
+.field-wrap:hover .field-hint,
+.field-wrap:focus-within .field-hint {
+  display: block;
+}

@@ -34,7 +34,8 @@ from internship.views import (
     EvaluationListView, FinalGradeView,
     NotificationListView, NotificationDetailView, FlagCreateView,
     PublishGradeView,
-    UserListView
+    UserListView,
+    ProfileView
 )
 #this is for admin as always
 urlpatterns = [
@@ -75,5 +76,8 @@ urlpatterns = [
     path('grades/', FinalGradeView.as_view(), name='final-grade'),
     path('grades/create/',FinalGradeCreateView.as_view(), name='grade-create'),
     path('grades/<int:pk>/publish/', PublishGradeView.as_view(), name='grade-publish'),
+    
+    #for the profile view 
+    path('profile/', ProfileView.as_view(), name='profile'),
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
