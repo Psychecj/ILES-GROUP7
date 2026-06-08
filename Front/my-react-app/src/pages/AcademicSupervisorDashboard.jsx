@@ -96,6 +96,11 @@ export default function AcademicSupervisorDashboard() {
         </h1>
         {gradeMsg && <div className='as-success'>{gradeMsg}</div>}
 
+        {placements.length === 0 && (
+  <div className="as-empty">
+    No students are currently assigned to you. Once the internship admin assigns students, they will appear here.
+  </div>
+)}
         {placements.map(p => {
           const stuLogs = logs.filter(l => l.placement === p.id);
           const stuGrades = grades.filter(g => g.placement === p.id);
