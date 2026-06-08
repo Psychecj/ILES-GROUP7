@@ -17,31 +17,41 @@ export default function AcademicSupervisorDashboard() {
 
   const navigate = useNavigate();
   const user = getUser();
+  const displayName = user?.username || user?.email?.split("@")[0] || "Academic Supervisor";
 
   useEffect(() => {
-    Promise.all([
-      getPlacements(),
-      getWeeklyLogs(),
-      getGrades(),
-      getEvaluations()
-    ])
-      .then(([pData, lData, gData, eData]) => {
-        setPlacements(Array.isArray(pData) ? pData : pData.results ?? []);
-        setLogs(Array.isArray(lData) ? lData : lData.results ?? []);
-        setGrades(Array.isArray(gData) ? gData : gData.results ?? []);
-        setEvaluations(Array.isArray(eData) ? eData : eData.results ?? []);
-      })
-      .catch(() => setError('Failed to load dashboard data.'))
-      .finally(() => setLoading(false));
+    fetchDashboardData();
   }, []);
+
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [pData, lData, gData, eData] = await Promise.all([getPlacements(), getWeeklyLogs(), getGrades(), getEvaluations()]);
+      setPlacements(Array.isArray(pData) ? pData : pData.results ?? []);
+      setLogs(Array.isArray(lData) ? lData : lData.results ?? []);
+      setGrades(Array.isArray(gData) ? gData : gData.results ?? []);
+      setEvaluations(Array.isArray(eData) ? eData : eData.results ?? []);
+    } catch (err) {
+      setError(err.message || "Failed to load dashboard data.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogout = () => {
     logOut();
-    navigate('/');
+    navigate("/");
   };
 
   const handleGradeChange = (e) => {
-    setGradeForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    setGradeForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const openGradeForm = (placementId) => {
+    setActivePlacementId(placementId);
+    setGradeForm({ academic_score: "", remarks: "" });
+    setGradeMsg("");
   };
 
   const handleGradeSubmit = async (placementId) => {
@@ -56,11 +66,10 @@ export default function AcademicSupervisorDashboard() {
       setActivePlacementId(null);
       setGradeForm({ score: '', remarks: '' });
       const data = await getGrades();
-      setGrades(data.results ?? data);
-      setTimeout(() => setGradeMsg(''), 3000);
+      setGrades(Array.isArray(data) ? data : data.results ?? []);
+      setTimeout(() => setGradeMsg(""), 3000);
     } catch (err) {
-      setGradeMsg('Error: ' + (err.message || 'Submission failed'));
-      console.error(err);
+      setGradeMsg("Error: " + (err.message || "Submission failed"));
     }
   };
 
@@ -69,27 +78,17 @@ export default function AcademicSupervisorDashboard() {
     const avgTech = evaluations.reduce((sum, e) => sum + (e.technical_skills || 0), 0) / evaluations.length;
     const avgComm = evaluations.reduce((sum, e) => sum + (e.communication_skills || 0), 0) / evaluations.length;
     const avgPunc = evaluations.reduce((sum, e) => sum + (e.punctuality || 0), 0) / evaluations.length;
-    return [{ name: 'Average', Technical: avgTech, Communication: avgComm, Punctuality: avgPunc }];
+    return [{ name: "Average", Technical: avgTech, Communication: avgComm, Punctuality: avgPunc }];
   };
 
-  const ScoreBar = ({ label, value, max = 10 }) => (
-    <div className='as-score-row'>
-      <span className='as-score-label'>{label}</span>
-      <div className='as-bar-bg'>
-        <div className='as-bar-fill' style={{ width: `${(value / max) * 100}%` }} />
-      </div>
-      <span className='as-score-val'>{value}/{max}</span>
-    </div>
-  );
-
-  if (loading) return <div className='as-loading'>Loading...</div>;
-  if (error) return <div className='as-error'>{error}</div>;
+  if (loading) return <div className="as-loading">Loading...</div>;
+  if (error) return <div className="as-error">{error}</div>;
 
   return (
-    <div className='as-root'>
-      <aside className='as-sidebar'>
-        <div className='as-logo'>ILES</div>
-        <button className='as-logout' onClick={handleLogout}>Logout</button>
+    <div className="as-root">
+      <aside className="as-sidebar">
+        <div className="as-logo">ILES</div>
+        <button className="as-logout" onClick={handleLogout}>Logout</button>
       </aside>
       <main className='as-main'>
         <h1 className='as-title'>
@@ -102,16 +101,14 @@ export default function AcademicSupervisorDashboard() {
           const stuGrades = grades.filter(g => g.placement === p.id);
           const hasGrade = stuGrades.length > 0;
           return (
-            <div key={p.id} className='as-student-card'>
-              <h2 className='as-student-name'>{p.student?.username}</h2>
-              <h3 className='as-section-hdr'>Weekly Logs</h3>
-              {stuLogs.map(log => (
-                <div key={log.id} className='as-log-row'>
+            <div key={p.id} className="as-student-card">
+              <h2 className="as-student-name">{p.student?.username || "Student"} - {p.company_name}</h2>
+              <h3 className="as-section-hdr">Weekly Logs</h3>
+              {placementLogs.length === 0 ? <p className="as-muted">No weekly logs submitted for this placement yet.</p> : placementLogs.map((log) => (
+                <div key={log.id} className="as-log-row">
                   <span>Week {log.week}</span>
-                  <span className={`as-badge as-badge-${log.status.toLowerCase()}`}>
-                    {log.status}
-                  </span>
-                  <span>{log.description?.slice(0, 60)}...</span>
+                  <span className={`as-badge as-badge-${String(log.status).toLowerCase()}`}>{log.status}</span>
+                  <span>{log.description?.slice(0, 70)}{log.description?.length > 70 ? "..." : ""}</span>
                 </div>
               ))}
               <h3 className='as-section-hdr'>Evaluation Scores</h3>
@@ -123,28 +120,29 @@ export default function AcademicSupervisorDashboard() {
                   <p><strong>Remarks:</strong> {g.remarks}</p>
                 </div>
               ))}
+
               {!hasGrade && (
-                <div className='as-grade-section'>
-                  <button className='as-grade-btn' onClick={() => setActivePlacementId(p.id)}>
-                    + Assign Final Grade
-                  </button>
+                <div className="as-grade-section">
+                  <button className="as-open-grade" onClick={() => openGradeForm(p.id)}>+ Assign Final Grade</button>
                   {activePlacementId === p.id && (
-                    <div className='as-grade-form'>
+                    <div className="as-grade-form">
                       <input
-                        type='number'
-                        name='score'
-                        placeholder='Score (0-100)'
-                        value={gradeForm.score}
+                        type="number"
+                        name="academic_score"
+                        placeholder="Academic score (0-100)"
+                        value={gradeForm.academic_score}
                         onChange={handleGradeChange}
-                        min='0'
-                        max='100'
+                        min="0"
+                        max="100"
+                        title="Enter the academic supervisor score between 0 and 100."
                       />
                       <textarea
-                        name='remarks'
-                        placeholder='Overall remarks'
+                        name="remarks"
+                        placeholder="Overall remarks"
                         value={gradeForm.remarks}
                         onChange={handleGradeChange}
-                        rows='2'
+                        title="Add a short comment explaining the student's performance."
+                        rows="2"
                       />
                       <div className='as-grade-actions'>
                         <button onClick={() => handleGradeSubmit(p.id)}>Submit Grade</button>
@@ -159,7 +157,7 @@ export default function AcademicSupervisorDashboard() {
         })}
 
         {getChartData().length > 0 && (
-          <div className='as-chart-box'>
+          <div className="as-chart-box">
             <h3>Evaluation Scores Overview (Average across all students)</h3>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={getChartData()} barGap={4}>
@@ -168,9 +166,9 @@ export default function AcademicSupervisorDashboard() {
                 <YAxis domain={[0, 10]} tick={{ fontSize: 12 }} />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="Technical" fill="#1A73E8" radius={[4,4,0,0]} />
-                <Bar dataKey="Communication" fill="#2E7D32" radius={[4,4,0,0]} />
-                <Bar dataKey="Punctuality" fill="#E65100" radius={[4,4,0,0]} />
+                <Bar dataKey="Technical" fill="#1A73E8" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Communication" fill="#2E7D32" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Punctuality" fill="#E65100" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

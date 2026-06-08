@@ -79,3 +79,10 @@
 .as-open-grade { background: #E8F0FE; color: #1A73E8; border: 1px solid #1A73E8; padding: 7px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }
 
 .as-grade-msg { font-size: 13px; margin-top: 8px; color: #2E7D32; }
+
+.as-subtitle { color: #64748b; margin-top: -16px; margin-bottom: 20px; }
+.as-success { background: #e8f5e9; color: #2e7d32; padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; }
+.as-error-inline { background: #fff1f2; color: #b91c1c; padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; }
+.as-empty, .as-muted { color: #64748b; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 12px; }
+.as-scores-summary { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+.as-grade-actions { display: flex; gap: 8px; }
