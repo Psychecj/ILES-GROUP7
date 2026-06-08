@@ -91,6 +91,7 @@ class PlacementSerializer(serializers.ModelSerializer):
     student = UserSerializer(read_only=True) 
     workplace_supervisor = UserSerializer(read_only=True)
     academic_supervisor = UserSerializer(read_only=True)
+    final_grade = FinalGradesSerializer(read_only=True) # Custom method field to include final grade details
 
 
     # WRITE-ONLY ID fields — accepted in POST/PUT/PATCH requests
@@ -220,7 +221,9 @@ class FinalGradeSerializer(serializers.ModelSerializer):
     """
     class Meta:
         model = FinalGrade 
-        fields = '__all__'
+        """fields = '__all__'"""
+        #changed to only return the fields that are needed by the frontend and not all the fields in the model
+        fields = ['id', 'grade_letter', 'academic_score', 'published', 'remarks', 'created_at', 'updated_at']
 
 class LogReviewSerializer(serializers.ModelSerializer):
     """
