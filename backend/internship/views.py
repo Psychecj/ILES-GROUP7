@@ -111,6 +111,12 @@ class PlacementDetailView(APIView):
 
 
 #now the weeklylog endpoint
+def user_can_access_log(user, log):
+    if user.role == 'INTERNSHIP_ADMIN': return True
+    if user.role == 'STUDENT': return log.student_id == user.id
+    if user.role == 'WORKPLACE_SUPERVISOR': return log.placement and log.placement.workplace_supervisor_id == user.id
+    if user.role == 'ACADEMIC_SUPERVISOR' : return log.placement and log.placement.academic_supervisor_id == user.id
+    return False
 class WeeklyLogListView(APIView):
     #we want to allow students to submit weekly logs but only authenticated users can view them
     def get_permissions(self):
