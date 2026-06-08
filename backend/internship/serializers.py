@@ -91,7 +91,7 @@ class PlacementSerializer(serializers.ModelSerializer):
     student = UserSerializer(read_only=True) 
     workplace_supervisor = UserSerializer(read_only=True)
     academic_supervisor = UserSerializer(read_only=True)
-    final_grade = FinalGradesSerializer(read_only=True) # Custom method field to include final grade details
+    final_grade = FinalGradeSerializer(read_only=True) # Custom method field to include final grade details
 
 
     # WRITE-ONLY ID fields — accepted in POST/PUT/PATCH requests
