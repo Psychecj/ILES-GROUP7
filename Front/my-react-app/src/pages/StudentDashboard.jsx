@@ -601,6 +601,8 @@ export default function StudentDashboard() {
   </section>
 )}
         {grade && grade.published && <GradeCard grade={grade} />}
+        {activeTab === "profile" && renderProfile()}
+{activeTab === "reports" && renderReports()}
       </main>
     </div>
   );
