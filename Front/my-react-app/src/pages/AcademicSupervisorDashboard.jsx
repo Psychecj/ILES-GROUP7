@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { getUser, logOut, getPlacements, getWeeklyLogs, getGrades, getEvaluations } from '../services/api';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import './AcademicSupervisorDashboard.css';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { getUser, logOut, getPlacements, getWeeklyLogs, getGrades, getEvaluations, createGrade } from "../services/api";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import "./AcademicSupervisorDashboard.css";
 
 export default function AcademicSupervisorDashboard() {
   const [placements, setPlacements] = useState([]);
@@ -10,139 +10,149 @@ export default function AcademicSupervisorDashboard() {
   const [grades, setGrades] = useState([]);
   const [evaluations, setEvaluations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [gradeForm, setGradeForm] = useState({ placement: '', score: '', remarks: '' });
-  const [gradeMsg, setGradeMsg] = useState('');
+  const [error, setError] = useState("");
+  const [gradeForm, setGradeForm] = useState({ academic_score: "", remarks: "" });
+  const [gradeMsg, setGradeMsg] = useState("");
   const [activePlacementId, setActivePlacementId] = useState(null);
 
   const navigate = useNavigate();
   const user = getUser();
+  const displayName = user?.username || user?.email?.split("@")[0] || "Academic Supervisor";
 
   useEffect(() => {
-    Promise.all([
-      getPlacements(),
-      getWeeklyLogs(),
-      getGrades(),
-      getEvaluations()
-    ])
-      .then(([pData, lData, gData, eData]) => {
-        setPlacements(Array.isArray(pData) ? pData : pData.results ?? []);
-        setLogs(Array.isArray(lData) ? lData : lData.results ?? []);
-        setGrades(Array.isArray(gData) ? gData : gData.results ?? []);
-        setEvaluations(Array.isArray(eData) ? eData : eData.results ?? []);
-      })
-      .catch(() => setError('Failed to load dashboard data.'))
-      .finally(() => setLoading(false));
+    fetchDashboardData();
   }, []);
 
-  const handleLogout = () => {
-    logOut();
-    navigate('/');
-  };
-
-  const handleGradeChange = (e) => {
-    setGradeForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
-  };
-
-  const handleGradeSubmit = async () => {
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    setError("");
     try {
-      await createGrade(gradeForm);
-      setGradeMsg('Grade submitted successfully!');
-      setActivePlacementId(null);
-      setGradeForm({ placement: '', score: '', remarks: '' });
-      const data = await getGrades();
-      setGrades(data.results ?? data);
-      setTimeout(() => setGradeMsg(''), 3000);
+      const [pData, lData, gData, eData] = await Promise.all([getPlacements(), getWeeklyLogs(), getGrades(), getEvaluations()]);
+      setPlacements(Array.isArray(pData) ? pData : pData.results ?? []);
+      setLogs(Array.isArray(lData) ? lData : lData.results ?? []);
+      setGrades(Array.isArray(gData) ? gData : gData.results ?? []);
+      setEvaluations(Array.isArray(eData) ? eData : eData.results ?? []);
     } catch (err) {
-      setGradeMsg('Error: ' + (err.message || 'Submission failed'));
-      console.error(err);
+      setError(err.message || "Failed to load dashboard data.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Prepare chart data: average of evaluation scores
+  const handleLogout = () => {
+    logOut();
+    navigate("/");
+  };
+
+  const handleGradeChange = (e) => {
+    setGradeForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const openGradeForm = (placementId) => {
+    setActivePlacementId(placementId);
+    setGradeForm({ academic_score: "", remarks: "" });
+    setGradeMsg("");
+  };
+
+  const handleGradeSubmit = async (placementId) => {
+    if (!gradeForm.academic_score || Number(gradeForm.academic_score) < 0 || Number(gradeForm.academic_score) > 100) {
+      setGradeMsg("Error: Academic score must be between 0 and 100.");
+      return;
+    }
+
+    try {
+      await createGrade({
+        placement: placementId,
+        academic_score: Number(gradeForm.academic_score),
+        remarks: gradeForm.remarks.trim(),
+      });
+      setGradeMsg("Grade submitted successfully!");
+      setActivePlacementId(null);
+      setGradeForm({ academic_score: "", remarks: "" });
+      const data = await getGrades();
+      setGrades(Array.isArray(data) ? data : data.results ?? []);
+      setTimeout(() => setGradeMsg(""), 3000);
+    } catch (err) {
+      setGradeMsg("Error: " + (err.message || "Submission failed"));
+    }
+  };
+
   const getChartData = () => {
     if (!evaluations.length) return [];
     const avgTech = evaluations.reduce((sum, e) => sum + (e.technical_skills || 0), 0) / evaluations.length;
     const avgComm = evaluations.reduce((sum, e) => sum + (e.communication_skills || 0), 0) / evaluations.length;
     const avgPunc = evaluations.reduce((sum, e) => sum + (e.punctuality || 0), 0) / evaluations.length;
-    return [{ name: 'Average', Technical: avgTech, Communication: avgComm, Punctuality: avgPunc }];
+    return [{ name: "Average", Technical: avgTech, Communication: avgComm, Punctuality: avgPunc }];
   };
 
-  const ScoreBar = ({ label, value, max = 10 }) => (
-    <div className='as-score-row'>
-      <span className='as-score-label'>{label}</span>
-      <div className='as-bar-bg'>
-        <div className='as-bar-fill' style={{ width: `${(value / max) * 100}%` }} />
-      </div>
-      <span className='as-score-val'>{value}/{max}</span>
-    </div>
-  );
-
-  if (loading) return <div className='as-loading'>Loading...</div>;
-  if (error) return <div className='as-error'>{error}</div>;
+  if (loading) return <div className="as-loading">Loading...</div>;
+  if (error) return <div className="as-error">{error}</div>;
 
   return (
-    <div className='as-root'>
-      <aside className='as-sidebar'>
-        <div className='as-logo'>ILES</div>
-        <button className='as-logout' onClick={handleLogout}>Logout</button>
+    <div className="as-root">
+      <aside className="as-sidebar">
+        <div className="as-logo">ILES</div>
+        <button className="as-logout" onClick={handleLogout}>Logout</button>
       </aside>
-      <main className='as-main'>
-        <h1 className='as-title'>Academic Supervisor Dashboard</h1>
-        {gradeMsg && <div className='as-success'>{gradeMsg}</div>}
+      <main className="as-main">
+        <h1 className="as-title">Welcome back, {displayName} 👋</h1>
+        <p className="as-subtitle">Academic Supervisor Dashboard</p>
+        {gradeMsg && <div className={gradeMsg.startsWith("Error") ? "as-error-inline" : "as-success"}>{gradeMsg}</div>}
 
-        {placements.map(p => {
-          const stuLogs = logs.filter(l => l.placement === p.id);
-          const stuGrades = grades.filter(g => g.placement === p.id);
-          const hasGrade = stuGrades.length > 0;
+        {placements.length === 0 && <div className="as-empty">No students are currently assigned to you. Once the internship admin assigns students, they will appear here.</div>}
+
+        {placements.map((p) => {
+          const placementLogs = logs.filter((l) => l.placement === p.id);
+          const placementGrades = grades.filter((g) => g.placement === p.id);
+          const hasGrade = placementGrades.length > 0;
           return (
-            <div key={p.id} className='as-student-card'>
-              <h2 className='as-student-name'>{p.student?.username}</h2>
-              <h3 className='as-section-hdr'>Weekly Logs</h3>
-              {stuLogs.map(log => (
-                <div key={log.id} className='as-log-row'>
+            <div key={p.id} className="as-student-card">
+              <h2 className="as-student-name">{p.student?.username || "Student"} - {p.company_name}</h2>
+              <h3 className="as-section-hdr">Weekly Logs</h3>
+              {placementLogs.length === 0 ? <p className="as-muted">No weekly logs submitted for this placement yet.</p> : placementLogs.map((log) => (
+                <div key={log.id} className="as-log-row">
                   <span>Week {log.week}</span>
-                  <span className={`as-badge as-badge-${log.status.toLowerCase()}`}>
-                    {log.status}
-                  </span>
-                  <span>{log.description?.slice(0, 60)}...</span>
+                  <span className={`as-badge as-badge-${String(log.status).toLowerCase()}`}>{log.status}</span>
+                  <span>{log.description?.slice(0, 70)}{log.description?.length > 70 ? "..." : ""}</span>
                 </div>
               ))}
-              <h3 className='as-section-hdr'>Evaluation Scores</h3>
-              {stuGrades.map(g => (
-                <div key={g.id} className='as-scores'>
-                  <ScoreBar label='Technical' value={g.technical_skills} />
-                  <ScoreBar label='Communication' value={g.communication_skills} />
-                  <ScoreBar label='Punctuality' value={g.punctuality} />
+
+              <h3 className="as-section-hdr">Evaluation Scores</h3>
+              {placementGrades.length === 0 ? <p className="as-muted">No final grade has been submitted yet.</p> : placementGrades.map((g) => (
+                <div key={g.id} className="as-scores-summary">
+                  <p><strong>Final Score:</strong> {g.score}/100 ({g.grade_letter})</p>
+                  <p><strong>Academic Score:</strong> {g.academic_score}</p>
+                  <p><strong>Published:</strong> {g.published ? "Yes" : "No"}</p>
+                  <p><strong>Remarks:</strong> {g.remarks || "None"}</p>
                 </div>
               ))}
+
               {!hasGrade && (
-                <div className='as-grade-section'>
-                  <button className='as-grade-btn' onClick={() => setActivePlacementId(p.id)}>
-                    + Assign Final Grade
-                  </button>
+                <div className="as-grade-section">
+                  <button className="as-open-grade" onClick={() => openGradeForm(p.id)}>+ Assign Final Grade</button>
                   {activePlacementId === p.id && (
-                    <div className='as-grade-form'>
+                    <div className="as-grade-form">
                       <input
-                        type='number'
-                        name='score'
-                        placeholder='Score (0-100)'
-                        value={gradeForm.score}
+                        type="number"
+                        name="academic_score"
+                        placeholder="Academic score (0-100)"
+                        value={gradeForm.academic_score}
                         onChange={handleGradeChange}
-                        min='0'
-                        max='100'
+                        min="0"
+                        max="100"
+                        title="Enter the academic supervisor score between 0 and 100."
                       />
                       <textarea
-                        name='remarks'
-                        placeholder='Overall remarks'
+                        name="remarks"
+                        placeholder="Overall remarks"
                         value={gradeForm.remarks}
                         onChange={handleGradeChange}
-                        rows='2'
+                        title="Add a short comment explaining the student's performance."
+                        rows="2"
                       />
-                      <input type='hidden' name='placement' value={p.id} />
-                      <div className='as-grade-actions'>
-                        <button onClick={handleGradeSubmit}>Submit Grade</button>
-                        <button onClick={() => setActivePlacementId(null)}>Cancel</button>
+                      <div className="as-grade-actions">
+                        <button className="as-submit-grade" onClick={() => handleGradeSubmit(p.id)}>Submit Grade</button>
+                        <button className="as-cancel" onClick={() => setActivePlacementId(null)}>Cancel</button>
                       </div>
                     </div>
                   )}
@@ -152,9 +162,8 @@ export default function AcademicSupervisorDashboard() {
           );
         })}
 
-        {/* Bar chart for average evaluation scores */}
         {getChartData().length > 0 && (
-          <div className='as-chart-box'>
+          <div className="as-chart-box">
             <h3>Evaluation Scores Overview (Average across all students)</h3>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={getChartData()} barGap={4}>
@@ -163,9 +172,9 @@ export default function AcademicSupervisorDashboard() {
                 <YAxis domain={[0, 10]} tick={{ fontSize: 12 }} />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="Technical" fill="#1A73E8" radius={[4,4,0,0]} />
-                <Bar dataKey="Communication" fill="#2E7D32" radius={[4,4,0,0]} />
-                <Bar dataKey="Punctuality" fill="#E65100" radius={[4,4,0,0]} />
+                <Bar dataKey="Technical" fill="#1A73E8" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Communication" fill="#2E7D32" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Punctuality" fill="#E65100" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
