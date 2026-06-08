@@ -58,8 +58,8 @@ class PlacementTests(TestCase):
             placement=placement, computed_by=self.academic)
         
         #this is our formula (10*4) + (10*3) + (10*3) =100
-        self.assertEqual(grade.grade, 100)
-        self.assertEqual(grade.letter_grade, 'A')
+        self.assertEqual(grade.score, 100)
+        self.assertEqual(grade.grade_letter, 'A')
 
     def test_completed_placement_cannot_change(self):
         placement = Placement.objects.create(

@@ -112,6 +112,12 @@ class PlacementDetailView(APIView):
 
 
 #now the weeklylog endpoint
+def user_can_access_log(user, log):
+    if user.role == 'INTERNSHIP_ADMIN': return True
+    if user.role == 'STUDENT': return log.student_id == user.id
+    if user.role == 'WORKPLACE_SUPERVISOR': return log.placement and log.placement.workplace_supervisor_id == user.id
+    if user.role == 'ACADEMIC_SUPERVISOR' : return log.placement and log.placement.academic_supervisor_id == user.id
+    return False
 class WeeklyLogListView(APIView):
     #we want to allow students to submit weekly logs but only authenticated users can view them
     def get_permissions(self):
@@ -213,6 +219,10 @@ class EvaluationListView(APIView):
         s = EvaluationFormSerializer(data=request.data)
         if s.is_valid():
             eval_obj = s.save(submitted_by=request.user)
+            if eval_obj.placement.workplace_supervisor_id != request.user.id:
+                eval_obj.delete{}
+                return Response( ['error': 'This placement is not assigned to you'], status=403)
+            eval_obj.change_status('Submitted')
             for admin_user in User.objects.filter(role='INTERNSHIP_ADMIN'):
                 create_notification(
                     admin_user,
