@@ -26,7 +26,13 @@ def login_user(email,password):
         'refresh_token': str(refresh), # this is the one that allows the user to stay logged in
         'user': {
             'id': user.id,
+            'username': user.username,
             'email': user.email,
             'role': user.role,
+            'profile_picture': user.profile_picture.url if user.profile_picture else None,
         }
     }
+
+def create_notification(user, message):
+    from .models import Notification
+    Notification.objects.create(recipient=user, message=message)

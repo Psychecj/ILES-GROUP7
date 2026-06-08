@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { getUser, logOut, getPlacements, getWeeklyLogs, getGrades, getEvaluations, createGrade } from "../services/api";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import "./AcademicSupervisorDashboard.css";
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { getUser, logOut, getPlacements, getWeeklyLogs, getGrades, getEvaluations, createGrade } from '../services/api';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import './AcademicSupervisorDashboard.css';
 
 export default function AcademicSupervisorDashboard() {
   const [placements, setPlacements] = useState([]);
@@ -10,9 +10,9 @@ export default function AcademicSupervisorDashboard() {
   const [grades, setGrades] = useState([]);
   const [evaluations, setEvaluations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [gradeForm, setGradeForm] = useState({ academic_score: "", remarks: "" });
-  const [gradeMsg, setGradeMsg] = useState("");
+  const [error, setError] = useState('');
+  const [gradeForm, setGradeForm] = useState({ score: '', remarks: '' });
+  const [gradeMsg, setGradeMsg] = useState('');
   const [activePlacementId, setActivePlacementId] = useState(null);
 
   const navigate = useNavigate();
@@ -55,20 +55,16 @@ export default function AcademicSupervisorDashboard() {
   };
 
   const handleGradeSubmit = async (placementId) => {
-    if (!gradeForm.academic_score || Number(gradeForm.academic_score) < 0 || Number(gradeForm.academic_score) > 100) {
-      setGradeMsg("Error: Academic score must be between 0 and 100.");
-      return;
-    }
-
     try {
-      await createGrade({
+      const payload = {
         placement: placementId,
-        academic_score: Number(gradeForm.academic_score),
-        remarks: gradeForm.remarks.trim(),
-      });
-      setGradeMsg("Grade submitted successfully!");
+        academic_score: Number(gradeForm.score),
+        remarks: gradeForm.remarks
+      };
+      await createGrade(payload);
+      setGradeMsg('Grade submitted successfully!');
       setActivePlacementId(null);
-      setGradeForm({ academic_score: "", remarks: "" });
+      setGradeForm({ score: '', remarks: '' });
       const data = await getGrades();
       setGrades(Array.isArray(data) ? data : data.results ?? []);
       setTimeout(() => setGradeMsg(""), 3000);
@@ -94,17 +90,16 @@ export default function AcademicSupervisorDashboard() {
         <div className="as-logo">ILES</div>
         <button className="as-logout" onClick={handleLogout}>Logout</button>
       </aside>
-      <main className="as-main">
-        <h1 className="as-title">Welcome back, {displayName} 👋</h1>
-        <p className="as-subtitle">Academic Supervisor Dashboard</p>
-        {gradeMsg && <div className={gradeMsg.startsWith("Error") ? "as-error-inline" : "as-success"}>{gradeMsg}</div>}
+      <main className='as-main'>
+        <h1 className='as-title'>
+          Welcome, {user?.username || user?.email?.split('@')[0] || "Academic Supervisor"}
+        </h1>
+        {gradeMsg && <div className='as-success'>{gradeMsg}</div>}
 
-        {placements.length === 0 && <div className="as-empty">No students are currently assigned to you. Once the internship admin assigns students, they will appear here.</div>}
-
-        {placements.map((p) => {
-          const placementLogs = logs.filter((l) => l.placement === p.id);
-          const placementGrades = grades.filter((g) => g.placement === p.id);
-          const hasGrade = placementGrades.length > 0;
+        {placements.map(p => {
+          const stuLogs = logs.filter(l => l.placement === p.id);
+          const stuGrades = grades.filter(g => g.placement === p.id);
+          const hasGrade = stuGrades.length > 0;
           return (
             <div key={p.id} className="as-student-card">
               <h2 className="as-student-name">{p.student?.username || "Student"} - {p.company_name}</h2>
@@ -116,14 +111,13 @@ export default function AcademicSupervisorDashboard() {
                   <span>{log.description?.slice(0, 70)}{log.description?.length > 70 ? "..." : ""}</span>
                 </div>
               ))}
-
-              <h3 className="as-section-hdr">Evaluation Scores</h3>
-              {placementGrades.length === 0 ? <p className="as-muted">No final grade has been submitted yet.</p> : placementGrades.map((g) => (
+              <h3 className='as-section-hdr'>Evaluation Scores</h3>
+              {stuGrades.map(g => (
                 <div key={g.id} className="as-scores-summary">
                   <p><strong>Final Score:</strong> {g.score}/100 ({g.grade_letter})</p>
                   <p><strong>Academic Score:</strong> {g.academic_score}</p>
-                  <p><strong>Published:</strong> {g.published ? "Yes" : "No"}</p>
-                  <p><strong>Remarks:</strong> {g.remarks || "None"}</p>
+                  <p><strong>Published:</strong> {g.published ? 'Yes' : 'No'}</p>
+                  <p><strong>Remarks:</strong> {g.remarks}</p>
                 </div>
               ))}
 
@@ -150,9 +144,9 @@ export default function AcademicSupervisorDashboard() {
                         title="Add a short comment explaining the student's performance."
                         rows="2"
                       />
-                      <div className="as-grade-actions">
-                        <button className="as-submit-grade" onClick={() => handleGradeSubmit(p.id)}>Submit Grade</button>
-                        <button className="as-cancel" onClick={() => setActivePlacementId(null)}>Cancel</button>
+                      <div className='as-grade-actions'>
+                        <button onClick={() => handleGradeSubmit(p.id)}>Submit Grade</button>
+                        <button onClick={() => setActivePlacementId(null)}>Cancel</button>
                       </div>
                     </div>
                   )}

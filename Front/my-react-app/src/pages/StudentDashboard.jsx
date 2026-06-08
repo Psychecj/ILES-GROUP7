@@ -8,10 +8,13 @@ import {
   getUser,
   getPlacements,
   getGrades,
-  getNotifications,
-  markNotificationRead,
+  getNotifications, markNotificationRead,
+  login_user,
+  updateProfile,
+  saveUser,
 } from "../services/api";
 import "./StudentDashboard.css";
+
 
 const emptyForm = {
   week: "",
@@ -41,16 +44,32 @@ export default function StudentDashboard() {
   const [successMsg, setSuccessMsg] = useState("");
   const [notifications, setNotifications] = useState([]);
   const [showNotifs, setShowNotifs] = useState(false);
-  const [activeTab, setActiveTab] = useState("logs");
+  // FIX 1: Added profile_picture to user state for easy access across the dashboard
+  const [activeTab, setActiveTab] = useState('logs');   // 'logs' | 'profile'
+  const [profileForm, setProfileForm] = useState({ username: user?.username || '', profile_picture: null });
+  const [profileMsg, setProfileMsg] = useState('');
+
 
   useEffect(() => {
     fetchDashboardData();
     getNotifications().then(setNotifications).catch(() => setNotifications([]));
   }, []);
 
-  const unread = notifications.filter((n) => !n.is_read).length;
+    //runs once when the page loads
+    //if login takes more than 4 seconds, the button text changes to let the user know it's not frozen — it's just the server starting up"
+    useEffect(() => {
+      getNotifications().then(setNotifications).catch(() => {});
+    }, []);
 
-  const fetchDashboardData = async () => {
+    const unread = notifications.filter(n => !n.is_read).length;
+    const handleNotifClick = async (id) => {
+    await markNotificationRead(id);
+    setNotifications(prev => prev.map(n =>
+    n.id === id ? { ...n, is_read: true } : n
+    ));
+  };
+
+  const fetchLogs = async () => {
     setLoading(true);
     setError("");
     try {
@@ -308,15 +327,36 @@ export default function StudentDashboard() {
       <aside className="sd-sidebar">
         <div className="sd-logo"><span className="sd-logo-icon">🎓</span><span className="sd-logo-text">ILES</span></div>
         <nav className="sd-nav">
-          <button type="button" className={`sd-nav-link ${activeTab === "logs" ? "active" : ""}`} onClick={() => setActiveTab("logs")}>📋 My Logs</button>
-          <button type="button" className={`sd-nav-link ${activeTab === "profile" ? "active" : ""}`} onClick={() => setActiveTab("profile")}>👤 Profile</button>
-          <button type="button" className={`sd-nav-link ${activeTab === "reports" ? "active" : ""}`} onClick={() => setActiveTab("reports")}>📊 Reports</button>
-          <button type="button" className="sd-nav-link" onClick={() => setShowNotifs(!showNotifs)}>Notifications {unread > 0 && <span className="notif-badge">{unread}</span>}</button>
+          <a href="#" className="sd-nav-link active">📋 My Logs</a>
+          
+          <button
+            className={`sd-nav-link ${activeTab === 'profile' ? 'active' : ''}`}
+            onClick={() => setActiveTab('profile')}
+          >
+          👤 Profile
+          </button>
+
+          <a href="#" className="sd-nav-link">📊 Reports</a>
+          <button
+            className={`sd-nav-link ${activeTab === 'reports' ? 'active' : ''}`}
+            onClick={() => setActiveTab('reports')}
+          >
+              📊 Reports
+          </button>
+          <button className='sd-nav-link' onClick={() => setShowNotifs(!showNotifs)}>
+                Notifications {unread > 0 && <span className='notif-badge'>{unread}</span>}
+          </button>
           {showNotifs && (
-            <div className="notif-panel">
-              {notifications.length === 0 && <p>No notifications</p>}
-              {notifications.map((n) => <div key={n.id} className={n.is_read ? "notif-read" : "notif-unread"} onClick={() => handleNotifClick(n.id)}>{n.message}</div>)}
+          <div className='notif-panel'>
+            {notifications.length === 0 && <p>No notifications</p>}
+            {notifications.map(n => (
+            <div key={n.id}
+                  className={n.is_read ? 'notif-read' : 'notif-unread'}
+                  onClick={() => handleNotifClick(n.id)}>
+                  {n.message}
             </div>
+                ))}
+          </div>
           )}
         </nav>
         <div className="sd-logout-wrapper"><button className="sd-logout-btn" onClick={handleLogout}>↩ Logout</button></div>
@@ -325,15 +365,242 @@ export default function StudentDashboard() {
       <main className="sd-main">
         <header className="sd-header">
           <div>
-            <h1 className="sd-welcome">Welcome back, {displayName} 👋</h1>
+            <h1 className="sd-welcome">
+           Welcome back, {user?.username || "Student"} 👋
+            </h1>
             <p className="sd-subtitle">Internship Logging & Evaluation System</p>
           </div>
           {activeTab === "logs" && <button className="sd-add-btn" onClick={() => { setShowForm(true); setEditIndex(null); setEditId(null); setForm(emptyForm); }}>+ New Log</button>}
         </header>
         {successMsg && <div className="sd-success">{successMsg}</div>}
-        {activeTab === "logs" && renderLogs()}
-        {activeTab === "profile" && renderProfile()}
-        {activeTab === "reports" && renderReports()}
+        {loading && <div className="loading">Loading...</div>}
+        {error && <div className="error">{error}</div>}
+
+        {showForm && (
+          <section className="sd-form-card">
+            <h2 className="sd-form-title">
+              {editIndex !== null ? "✏️ Edit Internship Log" : "📝 Submit Internship Log"}
+            </h2>
+
+            {errors.submit && <p className="sd-error-banner">{errors.submit}</p>}
+
+            <div className="sd-form-grid">
+              <div className="sd-field">
+                <label className="sd-label">Week Number *</label>
+                <input
+                  type="number"
+                  name="week"
+                  value={form.week}
+                  onChange={handleChange}
+                  className={`sd-input ${errors.week ? "sd-input-err" : ""}`}
+                />
+                {errors.week && <span className="sd-err-text">{errors.week}</span>}
+              </div>
+
+              <div className="sd-field">
+                <label className="sd-label">Hours Worked *</label>
+                <input
+                  type="number"
+                  name="hours"
+                  value={form.hours}
+                  onChange={handleChange}
+                  className={`sd-input ${errors.hours ? "sd-input-err" : ""}`}
+                />
+                {errors.hours && <span className="sd-err-text">{errors.hours}</span>}
+              </div>
+
+              <div className="sd-field sd-field-full">
+                <label className="sd-label">Description of Work *</label>
+                <textarea
+                  name="description"
+                  value={form.description}
+                  onChange={handleChange}
+                  rows={3}
+                  className={`sd-textarea ${errors.description ? "sd-input-err" : ""}`}
+                />
+                {errors.description && <span className="sd-err-text">{errors.description}</span>}
+              </div>
+
+              <div className="sd-field sd-field-full">
+                <label className="sd-label">Challenges Faced *</label>
+                <textarea
+                  name="challenges"
+                  value={form.challenges}
+                  onChange={handleChange}
+                  rows={3}
+                  className={`sd-textarea ${errors.challenges ? "sd-input-err" : ""}`}
+                />
+                {errors.challenges && <span className="sd-err-text">{errors.challenges}</span>}
+              </div>
+
+              <div className="sd-field sd-field-full">
+                <label className="sd-label">Skills Learned / Used *</label>
+                <textarea
+                  name="skills"
+                  value={form.skills}
+                  onChange={handleChange}
+                  rows={2}
+                  className={`sd-textarea ${errors.skills ? "sd-input-err" : ""}`}
+                />
+                {errors.skills && <span className="sd-err-text">{errors.skills}</span>}
+              </div>
+
+              <div className="sd-field sd-field-full">
+                <label className="sd-label">Attachment (optional)</label>
+                <label className="sd-file-label">
+                  📎 {form.attachmentName ? form.attachmentName : "Click to upload file"}
+                  <input
+                    type="file"
+                    name="attachment"
+                    onChange={handleChange}
+                    className="sd-file-input"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="sd-form-actions">
+              <button className="sd-submit-btn" onClick={handleSubmit}>
+                {editIndex !== null ? "Update Log" : "Submit Log"}
+              </button>
+              <button className="sd-cancel-btn" onClick={handleCancel}>
+                Cancel
+              </button>
+            </div>
+          </section>
+        )}
+
+        {!loading && !error && (
+          <section className="sd-table-section">
+            <h2 className="sd-section-title">My Internship Logs</h2>
+            <div className="sd-table-wrapper">
+              <table className="sd-table">
+                <thead>
+                  <tr>
+                    <th>Week</th>
+                    <th>Hours</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logs.map((log, i) => (
+                    <tr key={log.id || i}>
+                      <td style={{ maxWidth: '100px' }}>{log.week}</td>
+                      <td>{log.hours}h</td>
+                      <td>
+                        <span className={`sd-status sd-status-${(log.status || "pending").toLowerCase()}`}>
+                          {log.status || "Pending"}
+                        </span>
+                      </td>
+                      <td>
+                        <button className="sd-edit-btn" onClick={() => handleEdit(i, log)}>✏️ Edit</button>
+                        {log.status === 'Draft' && (
+                          <button 
+                            className="sd-submit-btn" 
+                            onClick={() => handleSubmitForReview(log.id)}
+                            style={{ marginLeft: '8px' }}
+                          >
+                            📤 Submit
+                          </button>
+                        )}
+                        {log.status === 'Rejected' && log.supervisor_comment && (
+                          <div className="sd-feedback" style={{ marginTop: '6px' }}>
+                            <strong>Feedback:</strong> {log.supervisor_comment}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+      {activeTab === 'profile' && (
+      <section className="sd-form-card">
+      <h2 className="sd-form-title">My Profile</h2>
+      {profileMsg && <p className="sd-success">{profileMsg}</p>}
+      <div className="sd-field">
+        <label className="sd-label">Username</label>
+        <input
+          className="sd-input"
+          value={profileForm.username}
+          onChange={e => setProfileForm(p => ({ ...p, username: e.target.value }))}
+        />
+      </div>
+        <div className="sd-field">
+        <label className="sd-label">Profile Picture</label>
+        <input type="file" accept="image/*"
+          onChange={e => setProfileForm(p => ({ ...p, profile_picture: e.target.files[0] }))}
+        />
+        </div>
+      <button className="sd-submit-btn" onClick={async () => {
+        try {
+          const updated = await updateProfile(profileForm);
+          saveUser({ ...user, username: updated.username, profile_picture: updated.profile_picture });
+          setProfileMsg('Profile updated!');
+          setTimeout(() => setProfileMsg(''), 3000);
+        } catch (err) {
+          setProfileMsg('Update failed: ' + err.message);
+        }
+      }}>
+        Save Changes
+      </button>
+    </section>
+    )}
+
+      {activeTab === 'reports' && (
+  <section className="sd-form-card">
+    <h2 className="sd-section-title">My Internship Report</h2>
+
+    <h3>Placement Summary</h3>
+    {placementId ? (
+      <p>Placement ID: {placementId} — data fetched via existing fetchPlacement()</p>
+    ) : (
+      <p>No placement assigned yet.</p>
+    )}
+
+    <h3>Weekly Log Summary</h3>
+    {logs.length === 0 ? (
+      <p>No logs submitted yet.</p>
+    ) : (
+      <table className="sd-table">
+        <thead>
+          <tr><th>Week</th><th>Hours</th><th>Status</th><th>Skills</th></tr>
+        </thead>
+        <tbody>
+          {logs.map(log => (
+            <tr key={log.id}>
+              <td>{log.week}</td>
+              <td>{log.hours}h</td>
+              <td>{log.status}</td>
+              <td>{log.skills || '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td><strong>Total</strong></td>
+            <td><strong>{logs.reduce((sum, l) => sum + (l.hours || 0), 0)}h</strong></td>
+            <td colSpan={2}></td>
+          </tr>
+        </tfoot>
+      </table>
+    )}
+
+    <h3>Final Grade</h3>
+    {grade && grade.published ? (
+      <p>
+        Grade: <strong>{grade.grade_letter}</strong> ({grade.score}/100)
+        {grade.remarks && <> — {grade.remarks}</>}
+      </p>
+    ) : (
+      <p>Grade not yet published.</p>
+    )}
+  </section>
+)}
+        {grade && grade.published && <GradeCard grade={grade} />}
       </main>
     </div>
   );

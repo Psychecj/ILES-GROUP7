@@ -8,15 +8,19 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from .models import User, Placement, WeeklyLog, EvaluationForm, FinalGrade
 from .serializers import (
     PlacementSerializer, WeeklyLogSerializer, EvaluationFormSerializer, FinalGradeSerializer,
-    RegisterSerializer,
+    RegisterSerializer,NotificationSerializer,FlagSerializer,UserSerializer
 )
-from .services import login_user
-#i added thse to make our forgot password safer by using djangos built in
+from .services import login_user, create_notification
+#i added these to make our forgot password safer by using djangos built in
 #token generator and email functionality
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.core.mail import send_mail
+from decouple import config as env_config
+from rest_framework.parsers import MultiPartParser, FormParser
+
+
 # Create your views here.
 
 #We use DRF's APIView class so weget JSON parsing authentication checking and error formatting for free
@@ -54,12 +58,20 @@ class PlacementListView(APIView):
         else:
             qs = Placement.objects.all()
         return Response(PlacementSerializer(qs, many=True).data)
-
-    def post(self, request): #now here the admin creates a palcement
+    #this is where the admin creates a placement and assigns the student and supervisors/CHANGED
+    """def post(self, request): #now here the admin creates a palcement
         s = PlacementSerializer(data=request.data)
         if s.is_valid():
             s.save()
             return Response(s.data,status=status.HTTP_201_CREATED)
+        return Response(s.errors, status=status.HTTP_400_BAD_REQUEST)"""
+    def post(self, request):
+        if request.user.role != 'INTERNSHIP_ADMIN':
+            return Response({'error':'Admin Only'}, status=403)
+        s = PlacementSerializer(data=request.data)
+        if s.is_valid():
+            placement = s.save(approved_by=request.user)
+            return Response(PlacementSerializer(placement).data, status=status.HTTP_201_CREATED)
         return Response(s.errors, status=status.HTTP_400_BAD_REQUEST)
     
 class PlacementDetailView(APIView):
@@ -84,10 +96,15 @@ class PlacementDetailView(APIView):
         new_status = request.data.get('status')    
 
         if new_status:
-            try :
+            try:
                 obj.change_status(new_status)
+                if new_status == 'Active':
+                    create_notification(
+                    obj.student,
+                    f"Your placement at {obj.company_name} has been activated. You can now submit weekly logs."
+                    )
             except Exception as e:
-                return Response({'error':str(e)}, status=400)
+                return Response({'error': str(e)}, status=400)
         s = PlacementSerializer(obj, data=request.data, partial=True)
         if s.is_valid():
             s.save()
@@ -150,7 +167,24 @@ class WeeklyLogDetailView(APIView):
         new_status = request.data.get('status')
         if new_status:
             try:
-                obj.change_status(new_status)
+                try:
+                    obj.change_status(new_status)
+                except Exception as e:
+                    return Response({'error': str(e)}, status=400)
+                # Notify the student when their log is reviewed
+                if new_status in ('Approved', 'Rejected'):
+                    create_notification(
+                    obj.student,
+                    f"Your Week {obj.week} log has been {new_status.lower()} by your supervisor."
+                 )
+                # Notify supervisors when a student submits a log
+                if new_status == 'Submitted' and obj.placement:
+                    placement = obj.placement
+                if placement.workplace_supervisor:
+                     create_notification(
+                    placement.workplace_supervisor,
+                    f"Student {obj.student.username} has submitted their Week {obj.week} log."
+                )
             except Exception as e:
                 return Response({'error': str(e)}, status=400)
             
@@ -168,10 +202,8 @@ class EvaluationListView(APIView):
         if role == 'WORKPLACE_SUPERVISOR':
             qs = EvaluationForm.objects.filter(submitted_by=request.user)
         elif role == 'ACADEMIC_SUPERVISOR':
-            qs = EvaluationForm.objects.filter(
-            placement__workplace_supervisor=request.user
-        )
-        elif role == 'INTERNSHIP ADMIN':
+            qs = EvaluationForm.objects.filter(placement__academic_supervisor=request.user)
+        elif role == 'INTERNSHIP_ADMIN':
             qs = EvaluationForm.objects.all()
         else:
             qs = EvaluationForm.objects.filter(placement__student=request.user)
@@ -217,18 +249,21 @@ class EvaluationDetailView(APIView):
         if s.is_valid():
             s.save()
             return Response(EvaluationFormSerializer(obj).data)
+        return Response(s.errors, status=400)
         
  #and finally the final grade endpoint
 class FinalGradeView(APIView):
     permission_classes= [IsAuthenticated]
 
     def get(self, request):
-        qs = FinalGrade.objects.filter(
-            placement__student=request.user,
-            published=True
-        )       
-        return Response(FinalGradeSerializer(qs, many=True).data)
-    
+        role = request.user.role
+        if role == 'STUDENT':
+            qs = FinalGrade.objects.filter(placement__student=request.user, published=True)
+        elif role == 'ACADEMIC_SUPERVISOR':
+            qs = FinalGrade.objects.filter(placement__academic_supervisor=request.user)
+        else:
+            qs = FinalGrade.objects.all()
+        return Response(FinalGradeSerializer(qs, many=True).data)            
 class FinalGradeCreateView(APIView):
     """POST/grades/create/
     Academic supervisor submits the final grade for a student.
@@ -238,42 +273,84 @@ class FinalGradeCreateView(APIView):
 
     def post(self, request):
         if request.user.role != 'ACADEMIC_SUPERVISOR':
-            return Response({'error':'Only academic supervisors can  submit grades'}, status=403
+            return Response(
+                {'error': 'Only academic supervisors can submit grades'},
+                status=403
             )
+
         placement_id = request.data.get('placement')
         academic_score = request.data.get('academic_score', 0)
         remarks = request.data.get('remarks', '')
-        #Validate placement exists and belongs to this supervisor
-    try:
-          placement = Placement.objects.get(pk=placement_id, academic_supervisor=request.user)
-    except Placement.DoesNotExist:
-        return Response({'error':'Placement not found or not assigned to you'}, status=404)  
-        #Prevent double submission - check if grade already exists
-    if hasattr(placement, 'final_grade') and placement.final_grade.published:
-        return Response({'error': 'Grade already published for this placement'}, status=400) 
-    #Check WP evaluation is submitted before grading
-    wp_eval_exists = EvaluationForm.objects.filter(placement=placement,status__in=['Submitted', 'Reviewed']).exists()
-    if not wp_eval_exists:
-        return Response({'error':'Workplace supervisor evaluation must be submitted before grading'},status=400)
-    #get_or_create prevents duplicate grades at application level too
-    grade, created = FinalGrade.objects.get_or_create(
-        placement=placement, defaults={'computed_by': request.user, 'academic_score': float(academic_score), 'remarks': remarks}
-    )
-    if not created:
-        #Update existing draft grade
-        grade.academic_score = float(academic_score)
-        grade.remarks = remarks
-        grade.computed_by = request.user
-        grade.save()  #triggers compute_weighted_score() automatically
-    
-    return Response({'success': True,
-                     'grade': FinalGradeSerializer(grade).data,
-                     'breakdown': {
-                         'formula': 'technical(*4)+ communication(*3)+ punctuality(*3)',
-                         'computed_score': grade.score,
-                         'grade_letter': grade.grade_letter,
-                         'note': 'Score auto-computed from WP evaluation form'}
-                     }, status=201 if created else 200)
+
+        # Convert academic_score safely
+        try:
+            academic_score = float(academic_score)
+        except (TypeError, ValueError):
+            return Response(
+                {'error': 'Academic score must be a valid number'},
+                status=400
+            )
+
+        # Validate placement exists and belongs to this supervisor
+        try:
+            placement = Placement.objects.get(
+                pk=placement_id,
+                academic_supervisor=request.user
+            )
+        except Placement.DoesNotExist:
+            return Response(
+                {'error': 'Placement not found or not assigned to you'},
+                status=404
+            )
+
+        # Prevent double submission if final grade is already published
+        if hasattr(placement, 'final_grade') and placement.final_grade.published:
+            return Response(
+                {'error': 'Grade already published for this placement'},
+                status=400
+            )
+
+        # Check workplace supervisor evaluation is submitted before grading
+        wp_eval_exists = EvaluationForm.objects.filter(
+            placement=placement,
+            status__in=['Submitted', 'Reviewed']
+        ).exists()
+
+        if not wp_eval_exists:
+            return Response(
+                {'error': 'Workplace supervisor evaluation must be submitted before grading'},
+                status=400
+            )
+
+        # Create or update final grade
+        grade, created = FinalGrade.objects.get_or_create(
+            placement=placement,
+            defaults={
+                'computed_by': request.user,
+                'academic_score': academic_score,
+                'remarks': remarks,
+            }
+        )
+
+        if not created:
+            grade.academic_score = academic_score
+            grade.remarks = remarks
+            grade.computed_by = request.user
+            grade.save()
+
+        return Response(
+            {
+                'success': True,
+                'grade': FinalGradeSerializer(grade).data,
+                'breakdown': {
+                    'formula': 'technical(*4) + communication(*3) + punctuality(*3)',
+                    'computed_score': grade.score,
+                    'grade_letter': grade.grade_letter,
+                    'note': 'Score auto-computed from WP evaluation form'
+                }
+            },
+            status=201 if created else 200
+        )
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
@@ -306,7 +383,11 @@ class RequestPasswordResetView(APIView):
             
             #this is the link we send to the user
             #it enables them to strt the reset process
-            reset_link = f"http://localhost:3000/reset-password/{uid}/{token}/"
+            FRONTEND_URL = env_config('FRONTEND_URL', default='http://localhost:5173')
+            reset_link = f'{FRONTEND_URL}/reset-password/{uid}/{token}/'
+            FRONTEND_URL='http://localhost:5173'
+            # On Render add environment variable:
+            FRONTEND_URL='https://your-app.vercel.app'
             
             #we now send then an email with the reset password link
             send_mail(
@@ -321,7 +402,8 @@ class RequestPasswordResetView(APIView):
                 'success': True,
                 'message': 'A reset link has been sent to your email check'
             }, status=200)
-
+            #we return success even if the usr doesnt exist for security reasons
+            #we dont want to reveal if an email is registered or not to potential attackers
         except User.DoesNotExist:
             #we return success even if the usr doesnt exist for security reasons
             #we dont want to reveal if an email is registered or not to potential attackers
@@ -363,24 +445,103 @@ class ConfirmPasswordResetView(APIView):
         
         return Response({'error': 'The reset link is invalid or has expired please try again.'}, status=400)
     
-    class PublishGradeView(APIView):
-        permission_classes = [IsAuthenticated]
-        def post (self,request, pk):
-            if request.user.role != 'INTERNSHIP_ADMIN':
-                return Response({'error':'Admin Only'}, status=403)
-            try:
-                grade = FinalGrade.objects.get(pk=pk)
-            except FinalGrade.DoesNotExist:
-                return Response({'error':'Grade not found'}, status=404)
-            grade.published = True
-            grade.save()
-            placement = grade.placement
-            try:
-                placement.change_status('Completed')
-            except Exception:
-                pass #already Completed is fine
-            create_notification(
-                placement.student,
-                f"Your final grade has been published. Score: {grade.score} ({grade.grade_letters})"
+
+class NotificationListView(APIView):
+    permission_classes = [IsAuthenticated ]
+    def get(self, request):
+        qs = request.user.notifications.all()
+        return Response(NotificationSerializer(qs, many=True).data)
+    # Handles marking a single notification as read.
+# Only the owner of the notification can mark it — we scope the lookup to
+# request.user.notifications so a user cannot mark someone else's notification
+class NotificationDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+    def patch(self, request, pk):
+        try:
+            notif = request.user.notifications.get(pk=pk)
+        except Exception:
+            return Response({'error':'Notification not found'}, status=404) 
+        # Mark the notification as read.
+        # NOTE: the model field is `is_read` — using `notif.read` would silently set
+        # a non-existent attribute and never actually update the database column.
+        notif.is_read = True
+        notif.save()
+        
+        # Return the updated notification so the frontend can reflect the change immediately
+        return Response(NotificationSerializer(notif).data)    
+
+    
+class PublishGradeView(APIView):
+    permission_classes = [IsAuthenticated]
+    def post (self,request, pk):
+        if request.user.role != 'INTERNSHIP_ADMIN':
+            return Response({'error':'Admin Only'}, status=403)
+        try:
+            grade = FinalGrade.objects.get(pk=pk)
+        except FinalGrade.DoesNotExist:
+            return Response({'error':'Grade not found'}, status=404)
+        grade.published = True
+        grade.save()
+        placement = grade.placement
+        try:
+            placement.change_status('Completed')
+        except Exception:
+            pass #already Completed is fine
+        create_notification(
+            placement.student,
+                f"Your final grade has been published. Score: {grade.score} ({grade.grade_letter})"
             )
-            return Response (FinalGradeSerializer(grade).data)
+        return Response (FinalGradeSerializer(grade).data)
+    # Allows an authenticated user to raise a flag on a placement or log.
+    # Flags are used to escalate concerns to the internship admin.
+    # IMPORTANT: `permission_classes` must be spelled exactly right — DRF only
+    # recognises this specific attribute name. A typo like `permision_classes`
+    # (one s) is silently ignored, leaving the endpoint completely unprotected
+    # so anyone on the internet could POST flags without logging in.
+class FlagCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+    # was: permission_classes (typo - endpoint was unprotected)
+    def post(self, request):
+        s = FlagSerializer(data=request.data)
+        if s.is_valid():
+            # automatically attach the user who raised the flag and save it
+            # we pass raised_by here instead of accepting it from request.data
+            # so a user cannot forge flags on behalf of someone else
+            s.save(raised_by=request.user)
+            return Response(s.data, status=201)
+        return Response(s.errors, status=400)
+    
+
+class UserListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        role = request.query_params.get('role')
+        if role:
+            qs = User.objects.filter(role=role)
+        return Response(UserSerializer(qs, many=True).data)
+    
+
+#profile functionality initially not working, but now added
+class ProfileView(APIView):
+    """
+    GET  /profile/  → return the authenticated user's own data
+    PATCH /profile/ → allow updating username and profile_picture
+    """
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def get(self, request):
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
+
+    def patch(self, request):
+        serializer = UserSerializer(
+            request.user,
+            data=request.data,
+            partial=True   # allow updating only some fields
+        )
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)

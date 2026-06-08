@@ -168,6 +168,22 @@ export const createFlag = (data) => apiFetch('/flags/', {
   body: JSON.stringify(data)
 });
 
-export const publishGrade = (id) => apiFetch(`/grades/${id}/publish/`, { method: 'POST' });
+export const publishGrade = (id) =>
+apiFetch(`/grades/${id}/publish/`, { method: 'POST' });
 
-export const pingServer = () => fetch(`${BASE_URL}/login/`, { method: 'GET' }).catch(() => null);
+// Add a "wake up" ping when the app loads
+export const pingServer = () => 
+  fetch(`${BASE_URL}/login/`, { method: 'GET' }).catch(() => {});
+
+
+// --- Profile ---
+export const getProfile = () => apiFetch('/profile/');
+export const updateProfile = (data) => {
+    const formData = new FormData();
+    Object.keys(data).forEach(key => {
+        if (data[key] !== null && data[key] !== undefined) {
+            formData.append(key, data[key]);
+        }
+    });
+    return apiFetch('/profile/', { method: 'PATCH', body: formData });
+};

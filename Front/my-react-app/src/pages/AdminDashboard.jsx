@@ -1,84 +1,58 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { getUser, logOut, getPlacements, updatePlacement, createPlacement, publishGrade, getUsers } from "../services/api";
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import "./AdminDashboard.css";
-
-const emptyPlacement = {
-  student_id: "",
-  company_name: "",
-  start_date: "",
-  end_date: "",
-  workplace_supervisor_id: "",
-  academic_supervisor_id: "",
-};
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { getUser, logOut, getPlacements, updatePlacement, createPlacement } from '../services/api';
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import './AdminDashboard.css';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const user = getUser();
-  const displayName = user?.username || user?.email?.split("@")[0] || "Admin";
 
   const [placements, setPlacements] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [students, setStudents] = useState([]);
-  const [wps, setWps] = useState([]);
-  const [academics, setAcademics] = useState([]);
+  const [error, setError] = useState('');
+  const [stats, setStats] = useState(null);
+
   const [showForm, setShowForm] = useState(false);
   const [formMsg, setFormMsg] = useState("");
   const [newPlacement, setNewPlacement] = useState(emptyPlacement);
 
   useEffect(() => {
-    fetchDashboardData();
+    getPlacements()
+      .then((data) => {
+        const placementsArray = data.results ?? data;
+        setPlacements(placementsArray);
+        if (Array.isArray(placementsArray)) {
+          const pending = placementsArray.filter(p => p.status === 'Pending').length;
+          const active = placementsArray.filter(p => p.status === 'Active').length;
+          const completed = placementsArray.filter(p => p.status === 'Completed').length;
+          const rejected = placementsArray.filter(p => p.status === 'Rejected').length;
+          setStats({ pending, active, completed, rejected });
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch placements', err);
+        setError('Could not load placements. Please refresh.');
+      })
+      .finally(() => setLoading(false));
   }, []);
 
-  const fetchDashboardData = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const [placementData, studentData, wpData, academicData] = await Promise.all([
-        getPlacements(),
-        getUsers("STUDENT"),
-        getUsers("WORKPLACE_SUPERVISOR"),
-        getUsers("ACADEMIC_SUPERVISOR"),
-      ]);
-      setPlacements(Array.isArray(placementData) ? placementData : placementData.results ?? []);
-      setStudents(Array.isArray(studentData) ? studentData : studentData.results ?? []);
-      setWps(Array.isArray(wpData) ? wpData : wpData.results ?? []);
-      setAcademics(Array.isArray(academicData) ? academicData : academicData.results ?? []);
-    } catch (err) {
-      setError(err.message || "Could not load admin dashboard data. Please refresh.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const countStatus = (status) => placements.filter((p) => String(p.status).toLowerCase() === status).length;
-  const stats = {
-    pending: countStatus("pending"),
-    active: countStatus("active"),
-    completed: countStatus("completed"),
-    rejected: countStatus("rejected"),
-  };
-
-  const handlePublish = async (gradeId) => {
-    try {
-      await publishGrade(gradeId);
-      setFormMsg("Grade published successfully!");
-      fetchDashboardData();
-    } catch (err) {
-      setFormMsg("Error: " + (err.message || "Could not publish grade"));
-    }
-  };
-
-  const handleActivate = async (id) => {
-    try {
-      await updatePlacement(id, { status: "Active" });
-      setPlacements((prev) => prev.map((p) => (p.id === id ? { ...p, status: "Active" } : p)));
-      setFormMsg("Placement set to Active.");
-    } catch (err) {
-      setFormMsg("Error: " + (err.message || "Failed to update placement"));
-    }
+  const handleActivate = (id) => {
+    updatePlacement(id, { status: 'Active' })
+      .then(() => {
+        setPlacements((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, status: 'Active' } : p))
+        );
+        setStats(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            pending: prev.pending - 1,
+            active: prev.active + 1,
+          };
+        });
+      })
+      .catch((err) => console.error('Failed to update placement', err));
   };
 
   const handleLogout = () => {
@@ -97,15 +71,13 @@ export default function AdminDashboard() {
       return;
     }
     try {
-      const payload = {
-        ...newPlacement,
-        company_name: newPlacement.company_name.trim(),
-        workplace_supervisor_id: newPlacement.workplace_supervisor_id || null,
-        academic_supervisor_id: newPlacement.academic_supervisor_id || null,
-      };
-      const created = await createPlacement(payload);
-      setPlacements((prev) => [created, ...prev]);
-      setFormMsg("Placement created successfully!");
+      const created = await createPlacement(newPlacement);
+      setPlacements(prev => [created, ...prev]);
+      setStats(prev => {
+        if (!prev) return { pending: 1, active: 0, completed: 0, rejected: 0 };
+        return { ...prev, pending: prev.pending + 1 };
+      });
+      setFormMsg('Placement created successfully!');
       setShowForm(false);
       setNewPlacement(emptyPlacement);
       setTimeout(() => setFormMsg(""), 3000);
@@ -156,10 +128,9 @@ export default function AdminDashboard() {
   return (
     <div className="ad-root">
       <div className="ad-header">
-        <div>
-          <h1 className="ad-title">Welcome back, {displayName} 👋</h1>
-          <p className="ad-subtitle">Internship Administrator Dashboard</p>
-        </div>
+        <h1 className="ad-title">
+          Welcome, {user?.username || user?.email?.split('@')[0] || "Admin"} — Admin Dashboard
+        </h1>
         <button className="ad-logout" onClick={handleLogout}>Logout</button>
       </div>
 
