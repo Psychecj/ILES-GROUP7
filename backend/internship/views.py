@@ -96,10 +96,15 @@ class PlacementDetailView(APIView):
         new_status = request.data.get('status')    
 
         if new_status:
-            try :
+            try:
                 obj.change_status(new_status)
+                if new_status == 'Active':
+                    create_notification(
+                    obj.student,
+                    f"Your placement at {obj.company_name} has been activated. You can now submit weekly logs."
+                    )
             except Exception as e:
-                return Response({'error':str(e)}, status=400)
+                return Response({'error': str(e)}, status=400)
         s = PlacementSerializer(obj, data=request.data, partial=True)
         if s.is_valid():
             s.save()
@@ -162,7 +167,24 @@ class WeeklyLogDetailView(APIView):
         new_status = request.data.get('status')
         if new_status:
             try:
-                obj.change_status(new_status)
+                try:
+                    obj.change_status(new_status)
+                except Exception as e:
+                    return Response({'error': str(e)}, status=400)
+                # Notify the student when their log is reviewed
+                if new_status in ('Approved', 'Rejected'):
+                    create_notification(
+                    obj.student,
+                    f"Your Week {obj.week} log has been {new_status.lower()} by your supervisor."
+                 )
+                # Notify supervisors when a student submits a log
+                if new_status == 'Submitted' and obj.placement:
+                    placement = obj.placement
+                if placement.workplace_supervisor:
+                     create_notification(
+                    placement.workplace_supervisor,
+                    f"Student {obj.student.username} has submitted their Week {obj.week} log."
+                )
             except Exception as e:
                 return Response({'error': str(e)}, status=400)
             
