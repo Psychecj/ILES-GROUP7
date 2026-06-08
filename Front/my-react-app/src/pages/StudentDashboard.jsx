@@ -270,7 +270,7 @@ export default function StudentDashboard() {
         </div>
         <nav className="sd-nav">
           <a href="#" className="sd-nav-link active">📋 My Logs</a>
-          <a href="#" className="sd-nav-link">👤 Profile</a>
+          
           <button
             className={`sd-nav-link ${activeTab === 'profile' ? 'active' : ''}`}
             onClick={() => setActiveTab('profile')}
@@ -279,6 +279,12 @@ export default function StudentDashboard() {
           </button>
 
           <a href="#" className="sd-nav-link">📊 Reports</a>
+          <button
+            className={`sd-nav-link ${activeTab === 'reports' ? 'active' : ''}`}
+            onClick={() => setActiveTab('reports')}
+          >
+              📊 Reports
+          </button>
           <button className='sd-nav-link' onClick={() => setShowNotifs(!showNotifs)}>
                 Notifications {unread > 0 && <span className='notif-badge'>{unread}</span>}
           </button>
@@ -495,6 +501,57 @@ export default function StudentDashboard() {
       </button>
     </section>
     )}
+
+      {activeTab === 'reports' && (
+  <section className="sd-form-card">
+    <h2 className="sd-section-title">My Internship Report</h2>
+
+    <h3>Placement Summary</h3>
+    {placementId ? (
+      <p>Placement ID: {placementId} — data fetched via existing fetchPlacement()</p>
+    ) : (
+      <p>No placement assigned yet.</p>
+    )}
+
+    <h3>Weekly Log Summary</h3>
+    {logs.length === 0 ? (
+      <p>No logs submitted yet.</p>
+    ) : (
+      <table className="sd-table">
+        <thead>
+          <tr><th>Week</th><th>Hours</th><th>Status</th><th>Skills</th></tr>
+        </thead>
+        <tbody>
+          {logs.map(log => (
+            <tr key={log.id}>
+              <td>{log.week}</td>
+              <td>{log.hours}h</td>
+              <td>{log.status}</td>
+              <td>{log.skills || '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td><strong>Total</strong></td>
+            <td><strong>{logs.reduce((sum, l) => sum + (l.hours || 0), 0)}h</strong></td>
+            <td colSpan={2}></td>
+          </tr>
+        </tfoot>
+      </table>
+    )}
+
+    <h3>Final Grade</h3>
+    {grade && grade.published ? (
+      <p>
+        Grade: <strong>{grade.grade_letter}</strong> ({grade.score}/100)
+        {grade.remarks && <> — {grade.remarks}</>}
+      </p>
+    ) : (
+      <p>Grade not yet published.</p>
+    )}
+  </section>
+)}
         {grade && grade.published && <GradeCard grade={grade} />}
       </main>
     </div>
