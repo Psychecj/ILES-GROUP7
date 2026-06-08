@@ -326,39 +326,54 @@ export default function StudentDashboard() {
     <div className="sd-root">
       <aside className="sd-sidebar">
         <div className="sd-logo"><span className="sd-logo-icon">🎓</span><span className="sd-logo-text">ILES</span></div>
-        <nav className="sd-nav">
-          <a href="#" className="sd-nav-link active">📋 My Logs</a>
-          
-          <button
+        <nav className='sd-nav'>
+            {/* nn My Logs nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn */}
+            {/* Was a dead <a href='#'> with no onClick. Now a button that
+            switches activeTab AND closes the log form for a clean view. */}
+            <button
+            className={`sd-nav-link ${activeTab === 'logs' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('logs'); setShowForm(false); }}
+            >
+            n My Logs
+            </button>
+            {/* nn Profile nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn */}
+            <button
             className={`sd-nav-link ${activeTab === 'profile' ? 'active' : ''}`}
             onClick={() => setActiveTab('profile')}
-          >
-          👤 Profile
-          </button>
-
-          <a href="#" className="sd-nav-link">📊 Reports</a>
-          <button
+            >
+            n Profile
+            </button>
+            {/* nn Reports — ONE button only, dead anchor removed nnnnnnn */}
+            <button
             className={`sd-nav-link ${activeTab === 'reports' ? 'active' : ''}`}
             onClick={() => setActiveTab('reports')}
-          >
-              📊 Reports
-          </button>
-          <button className='sd-nav-link' onClick={() => setShowNotifs(!showNotifs)}>
-                Notifications {unread > 0 && <span className='notif-badge'>{unread}</span>}
-          </button>
-          {showNotifs && (
-          <div className='notif-panel'>
+            >
+            n Reports
+            </button>
+            {/* nn Notifications nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn */}
+            <button
+            className='sd-nav-link'
+            onClick={() => setShowNotifs(!showNotifs)}
+            >
+            Notifications
+            {unread > 0 && <span className='notif-badge'>{unread}</span>}
+            </button>
+            {showNotifs && (
+            <div className='notif-panel'>
             {notifications.length === 0 && <p>No notifications</p>}
             {notifications.map(n => (
-            <div key={n.id}
-                  className={n.is_read ? 'notif-read' : 'notif-unread'}
-                  onClick={() => handleNotifClick(n.id)}>
-                  {n.message}
+            <div
+            key={n.id}
+            className={n.is_read ? 'notif-read' : 'notif-unread'}
+            onClick={() => handleNotifClick(n.id)}
+            >
+            {n.message}
             </div>
-                ))}
-          </div>
-          )}
+            ))}
+            </div>
+            )}
         </nav>
+        
         <div className="sd-logout-wrapper"><button className="sd-logout-btn" onClick={handleLogout}>↩ Logout</button></div>
       </aside>
 
