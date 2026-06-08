@@ -186,11 +186,11 @@ class WeeklyLogDetailView(APIView):
                 # Notify supervisors when a student submits a log
                 if new_status == 'Submitted' and obj.placement:
                     placement = obj.placement
-                if placement.workplace_supervisor:
-                     create_notification(
-                    placement.workplace_supervisor,
-                    f"Student {obj.student.username} has submitted their Week {obj.week} log."
-                )
+                    if placement.workplace_supervisor:
+                         create_notification(
+                        placement.workplace_supervisor,
+                        f"Student {obj.student.username} has submitted their Week {obj.week} log."
+                    )
             except Exception as e:
                 return Response({'error': str(e)}, status=400)
             
