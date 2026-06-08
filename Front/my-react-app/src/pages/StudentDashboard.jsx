@@ -57,10 +57,7 @@ export default function StudentDashboard() {
 
     //runs once when the page loads
     //if login takes more than 4 seconds, the button text changes to let the user know it's not frozen — it's just the server starting up"
-    useEffect(() => {
-      getNotifications().then(setNotifications).catch(() => {});
-    }, []);
-
+   
     const unread = notifications.filter(n => !n.is_read).length;
     const handleNotifClick = async (id) => {
     await markNotificationRead(id);
@@ -327,30 +324,30 @@ export default function StudentDashboard() {
       <aside className="sd-sidebar">
         <div className="sd-logo"><span className="sd-logo-icon">🎓</span><span className="sd-logo-text">ILES</span></div>
         <nav className='sd-nav'>
-            {/* nn My Logs nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn */}
+            {/* nn My Logs  */}
             {/* Was a dead <a href='#'> with no onClick. Now a button that
             switches activeTab AND closes the log form for a clean view. */}
             <button
-            className={`sd-nav-link ${activeTab === 'logs' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('logs'); setShowForm(false); }}
-            >
-            n My Logs
+                className={`sd-nav-link ${activeTab === 'logs' ? 'active' : ''}`}
+                onClick={() => { setActiveTab('logs'); setShowForm(false); }}
+                >
+                My Logs
             </button>
-            {/* nn Profile nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn */}
+            {/* nn Profile */}
             <button
             className={`sd-nav-link ${activeTab === 'profile' ? 'active' : ''}`}
             onClick={() => setActiveTab('profile')}
             >
-            n Profile
+              Profile
             </button>
             {/* nn Reports — ONE button only, dead anchor removed nnnnnnn */}
             <button
             className={`sd-nav-link ${activeTab === 'reports' ? 'active' : ''}`}
             onClick={() => setActiveTab('reports')}
             >
-            n Reports
+            Reports
             </button>
-            {/* nn Notifications nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn */}
+            {/* nn Notifications */}
             <button
             className='sd-nav-link'
             onClick={() => setShowNotifs(!showNotifs)}
@@ -360,16 +357,16 @@ export default function StudentDashboard() {
             </button>
             {showNotifs && (
             <div className='notif-panel'>
-            {notifications.length === 0 && <p>No notifications</p>}
-            {notifications.map(n => (
-            <div
-            key={n.id}
-            className={n.is_read ? 'notif-read' : 'notif-unread'}
-            onClick={() => handleNotifClick(n.id)}
-            >
-            {n.message}
-            </div>
-            ))}
+                {notifications.length === 0 && <p>No notifications</p>}
+                {notifications.map(n => (
+                <div
+                key={n.id}
+                className={n.is_read ? 'notif-read' : 'notif-unread'}
+                onClick={() => handleNotifClick(n.id)}
+                >
+                {n.message}
+                </div>
+                ))}
             </div>
             )}
         </nav>
