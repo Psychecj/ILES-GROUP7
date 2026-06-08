@@ -59,12 +59,7 @@ export default function StudentDashboard() {
     //if login takes more than 4 seconds, the button text changes to let the user know it's not frozen — it's just the server starting up"
    
     const unread = notifications.filter(n => !n.is_read).length;
-    const handleNotifClick = async (id) => {
-    await markNotificationRead(id);
-    setNotifications(prev => prev.map(n =>
-    n.id === id ? { ...n, is_read: true } : n
-    ));
-  };
+  
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -567,8 +562,8 @@ export default function StudentDashboard() {
     <h2 className="sd-section-title">My Internship Report</h2>
 
     <h3>Placement Summary</h3>
-    {placementId ? (
-      <p>Placement ID: {placementId} — data fetched via existing fetchPlacement()</p>
+    {placement ? (
+      <p>Company : {placement.company_name} </p>
     ) : (
       <p>No placement assigned yet.</p>
     )}
@@ -614,7 +609,7 @@ export default function StudentDashboard() {
 )}
         {grade && grade.published && <GradeCard grade={grade} />}
         {activeTab === "profile" && renderProfile()}
-{activeTab === "reports" && renderReports()}
+
       </main>
     </div>
   );

@@ -1,8 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getUser, logOut, getPlacements, updatePlacement, createPlacement, getUsers  } from '../services/api';
+import { getUser, logOut, getPlacements, updatePlacement, createPlacement, getUsers, publishGrade } from '../services/api';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import './AdminDashboard.css';
+
+const emptyPlacement = {
+  student_id: '', company_name: '', start_date: '',
+  end_date: '', workplace_supervisor_id: '', academic_supervisor_id: ''
+};
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -12,10 +17,12 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [stats, setStats] = useState(null);
-
   const [showForm, setShowForm] = useState(false);
   const [formMsg, setFormMsg] = useState("");
   const [newPlacement, setNewPlacement] = useState(emptyPlacement);
+  const [students, setStudents] = useState([]);
+  const [wps, setWps] = useState([]);
+  const [academics, setAcademics] = useState([]);
 
   useEffect(() => {
     getPlacements()
@@ -35,7 +42,24 @@ export default function AdminDashboard() {
         setError('Could not load placements. Please refresh.');
       })
       .finally(() => setLoading(false));
+
+    getUsers('STUDENT').then(d => setStudents(Array.isArray(d) ? d : d.results ?? [])).catch(() => {});
+    getUsers('WORKPLACE_SUPERVISOR').then(d => setWps(Array.isArray(d) ? d : d.results ?? [])).catch(() => {});
+    getUsers('ACADEMIC_SUPERVISOR').then(d => setAcademics(Array.isArray(d) ? d : d.results ?? [])).catch(() => {});
   }, []);
+
+  const handlePublish = async (gradeId) => {
+    try {
+      await publishGrade(gradeId);
+      setPlacements(prev => prev.map(p =>
+        p.final_grade?.id === gradeId
+          ? { ...p, final_grade: { ...p.final_grade, published: true } }
+          : p
+      ));
+    } catch (err) {
+      setError('Publish failed: ' + err.message);
+    }
+  };
 
   const handleActivate = (id) => {
     updatePlacement(id, { status: 'Active' })
@@ -45,11 +69,7 @@ export default function AdminDashboard() {
         );
         setStats(prev => {
           if (!prev) return prev;
-          return {
-            ...prev,
-            pending: prev.pending - 1,
-            active: prev.active + 1,
-          };
+          return { ...prev, pending: prev.pending - 1, active: prev.active + 1 };
         });
       })
       .catch((err) => console.error('Failed to update placement', err));
@@ -89,6 +109,7 @@ export default function AdminDashboard() {
   const COLORS = ["#FBBF24", "#60A5FA", "#34D399", "#F87171"];
 
   const StatsPanel = () => {
+    if (!stats) return null;
     const pieData = [
       { name: "Pending", value: stats.pending },
       { name: "Active", value: stats.active },
@@ -136,7 +157,9 @@ export default function AdminDashboard() {
 
       {formMsg && <div className={formMsg.startsWith("Error") ? "admin-error" : "admin-msg"}>{formMsg}</div>}
 
-      <button className="admin-add-btn" onClick={() => setShowForm(!showForm)}>{showForm ? "Cancel" : "+ New Placement"}</button>
+      <button className="admin-add-btn" onClick={() => setShowForm(!showForm)}>
+        {showForm ? "Cancel" : "+ New Placement"}
+      </button>
 
       {showForm && (
         <div className="admin-form-card">
@@ -183,7 +206,11 @@ export default function AdminDashboard() {
       <div className="ad-table-wrap">
         <table className="ad-table">
           <thead>
-            <tr><th>Student</th><th>Company</th><th>Status</th><th>Academic Supervisor</th><th>Workplace Supervisor</th><th>Action</th><th>Grade</th></tr>
+            <tr>
+              <th>Student</th><th>Company</th><th>Status</th>
+              <th>Academic Supervisor</th><th>Workplace Supervisor</th>
+              <th>Action</th><th>Grade</th>
+            </tr>
           </thead>
           <tbody>
             {placements.length === 0 ? (
@@ -195,8 +222,16 @@ export default function AdminDashboard() {
                 <td><span className={`ad-badge ad-badge-${String(p.status).toLowerCase()}`}>{p.status}</span></td>
                 <td>{p.academic_supervisor?.username || "—"}</td>
                 <td>{p.workplace_supervisor?.username || "—"}</td>
-                <td>{p.status === "Pending" ? <button className="ad-activate-btn" onClick={() => handleActivate(p.id)}>Set Active</button> : "—"}</td>
-                <td>{p.final_grade && !p.final_grade.published ? <button className="ad-activate-btn" onClick={() => handlePublish(p.final_grade.id)}>Publish Grade</button> : p.final_grade?.published ? "Published" : "—"}</td>
+                <td>
+                  {p.status === "Pending"
+                    ? <button className="ad-activate-btn" onClick={() => handleActivate(p.id)}>Set Active</button>
+                    : "—"}
+                </td>
+                <td>
+                  {p.final_grade && !p.final_grade.published
+                    ? <button className="ad-activate-btn" onClick={() => handlePublish(p.final_grade.id)}>Publish Grade</button>
+                    : p.final_grade?.published ? "Published" : "—"}
+                </td>
               </tr>
             ))}
           </tbody>
