@@ -9,6 +9,9 @@ import {
   getPlacements,
   getGrades,
   getNotifications, markNotificationRead,
+  login_user,
+  updateProfile,
+  saveUser,
 } from "../services/api";
 import "./StudentDashboard.css";
 
@@ -312,7 +315,7 @@ export default function StudentDashboard() {
         <header className="sd-header">
           <div>
             <h1 className="sd-welcome">
-           Welcome back, {user?.username || user?.email?.split('@')[0] || "Student"} 👋
+           Welcome back, {user?.username || "Student"} 👋
             </h1>
             <p className="sd-subtitle">Internship Logging & Evaluation System</p>
           </div>
