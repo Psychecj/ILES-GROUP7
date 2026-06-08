@@ -40,6 +40,11 @@ export default function StudentDashboard() {
   const [successMsg, setSuccessMsg] = useState("");
   const [notifications, setNotifications] = useState([]);
   const [showNotifs, setShowNotifs] = useState(false);
+  // FIX 1: Added profile_picture to user state for easy access across the dashboard
+  const [activeTab, setActiveTab] = useState('logs');   // 'logs' | 'profile'
+  const [profileForm, setProfileForm] = useState({ username: user?.username || '', profile_picture: null });
+  const [profileMsg, setProfileMsg] = useState('');
+
 
   useEffect(() => {
     fetchLogs();
@@ -266,6 +271,13 @@ export default function StudentDashboard() {
         <nav className="sd-nav">
           <a href="#" className="sd-nav-link active">📋 My Logs</a>
           <a href="#" className="sd-nav-link">👤 Profile</a>
+          <button
+            className={`sd-nav-link ${activeTab === 'profile' ? 'active' : ''}`}
+            onClick={() => setActiveTab('profile')}
+          >
+          👤 Profile
+          </button>
+
           <a href="#" className="sd-nav-link">📊 Reports</a>
           <button className='sd-nav-link' onClick={() => setShowNotifs(!showNotifs)}>
                 Notifications {unread > 0 && <span className='notif-badge'>{unread}</span>}
@@ -451,7 +463,38 @@ export default function StudentDashboard() {
             </div>
           </section>
         )}
-
+      {activeTab === 'profile' && (
+      <section className="sd-form-card">
+      <h2 className="sd-form-title">My Profile</h2>
+      {profileMsg && <p className="sd-success">{profileMsg}</p>}
+      <div className="sd-field">
+        <label className="sd-label">Username</label>
+        <input
+          className="sd-input"
+          value={profileForm.username}
+          onChange={e => setProfileForm(p => ({ ...p, username: e.target.value }))}
+        />
+      </div>
+        <div className="sd-field">
+        <label className="sd-label">Profile Picture</label>
+        <input type="file" accept="image/*"
+          onChange={e => setProfileForm(p => ({ ...p, profile_picture: e.target.files[0] }))}
+        />
+        </div>
+      <button className="sd-submit-btn" onClick={async () => {
+        try {
+          const updated = await updateProfile(profileForm);
+          saveUser({ ...user, username: updated.username, profile_picture: updated.profile_picture });
+          setProfileMsg('Profile updated!');
+          setTimeout(() => setProfileMsg(''), 3000);
+        } catch (err) {
+          setProfileMsg('Update failed: ' + err.message);
+        }
+      }}>
+        Save Changes
+      </button>
+    </section>
+    )}
         {grade && grade.published && <GradeCard grade={grade} />}
       </main>
     </div>
