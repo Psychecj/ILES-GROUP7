@@ -29,6 +29,7 @@ def login_user(email,password):
             'username': user.username,
             'email': user.email,
             'role': user.role,
+            'profile_picture': user.profile_picture.url if user.profile_picture else None,
         }
     }
 

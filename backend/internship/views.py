@@ -18,6 +18,9 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.core.mail import send_mail
 from decouple import config as env_config
+from rest_framework.parsers import MultiPartParser, FormParser
+
+
 # Create your views here.
 
 #We use DRF's APIView class so weget JSON parsing authentication checking and error formatting for free
@@ -29,7 +32,6 @@ class LoginView(APIView):
     def post(self, request):
         email = request.data.get('email','')
         password = request.data.get('password','')
-        requested_role = request.data.get('role')
 
         result = login_user(email, password)
 
@@ -39,12 +41,6 @@ class LoginView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED #this is what is shown to a suser we dont confirm after entering thir creds
 
             )
-        if requested_role and result['user']['role'] != requested_role:
-            return Response(
-                {'message': 'This account does not belong to the selected role'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
         return Response(result, status=status.HTTP_200_OK) #200 will mean everything good the credentials match
     
 #now the placement, weeklog and eavl end points
@@ -498,8 +494,32 @@ class UserListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        if request.user.role != 'INTERNSHIP_ADMIN':
-            return Response({'error':'Only internship admins can list users'}, status=403)
         role = request.query_params.get('role')
-        qs = User.objects.filter(role=role) if role else User.objects.all()
+        if role:
+            qs = User.objects.filter(role=role)
         return Response(UserSerializer(qs, many=True).data)
+    
+
+#profile functionality initially not working, but now added
+class ProfileView(APIView):
+    """
+    GET  /profile/  → return the authenticated user's own data
+    PATCH /profile/ → allow updating username and profile_picture
+    """
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def get(self, request):
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
+
+    def patch(self, request):
+        serializer = UserSerializer(
+            request.user,
+            data=request.data,
+            partial=True   # allow updating only some fields
+        )
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
