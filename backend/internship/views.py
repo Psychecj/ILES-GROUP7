@@ -5,7 +5,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import request, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from .models import User, Placement, WeeklyLog, EvaluationForm, FinalGrade
+from .models import User, Placement, WeeklyLog, EvaluationForm, FinalGrade, Flag
 from .serializers import (
     PlacementSerializer, WeeklyLogSerializer, EvaluationFormSerializer, FinalGradeSerializer,
     RegisterSerializer,NotificationSerializer,FlagSerializer,UserSerializer
@@ -118,6 +118,7 @@ def user_can_access_log(user, log):
     if user.role == 'WORKPLACE_SUPERVISOR': return log.placement and log.placement.workplace_supervisor_id == user.id
     if user.role == 'ACADEMIC_SUPERVISOR' : return log.placement and log.placement.academic_supervisor_id == user.id
     return False
+
 class WeeklyLogListView(APIView):
     #we want to allow students to submit weekly logs but only authenticated users can view them
     def get_permissions(self):
@@ -180,17 +181,18 @@ class WeeklyLogDetailView(APIView):
                 # Notify the student when their log is reviewed
                 if new_status in ('Approved', 'Rejected'):
                     create_notification(
-                    obj.student,
-                    f"Your Week {obj.week} log has been {new_status.lower()} by your supervisor."
-                 )
-                # Notify supervisors when a student submits a log
+                        obj.student,
+                        f"Your Week {obj.week} log has been {new_status.lower()} by your supervisor."
+                    )
+                # B-2 FIX: moved `if placement.workplace_supervisor:` one level deeper
+                # so it only runs when new_status == 'Submitted', not unconditionally
                 if new_status == 'Submitted' and obj.placement:
                     placement = obj.placement
                     if placement.workplace_supervisor:
-                         create_notification(
-                        placement.workplace_supervisor,
-                        f"Student {obj.student.username} has submitted their Week {obj.week} log."
-                    )
+                        create_notification(
+                            placement.workplace_supervisor,
+                            f"Student {obj.student.username} has submitted their Week {obj.week} log."
+                        )
             except Exception as e:
                 return Response({'error': str(e)}, status=400)
             
@@ -215,13 +217,18 @@ class EvaluationListView(APIView):
             qs = EvaluationForm.objects.filter(placement__student=request.user)
         return Response(EvaluationFormSerializer(qs, many=True).data)
         
+    # B-3 FIX: eval_obj.delete{} → eval_obj.delete()  and  ['error':...] → {'error':...}
     def post(self, request):
         s = EvaluationFormSerializer(data=request.data)
         if s.is_valid():
             eval_obj = s.save(submitted_by=request.user)
+            # Guard: make sure the logged-in supervisor owns this placement
             if eval_obj.placement.workplace_supervisor_id != request.user.id:
-                eval_obj.delete()
-                return Response( {'error': 'This placement is not assigned to you'}, status=403)
+                eval_obj.delete()  # FIX 1: () not {}
+                return Response(   # FIX 2: {} dict not []
+                    {'error': 'This placement is not assigned to you'},
+                    status=403
+                )
             eval_obj.change_status('Submitted')
             for admin_user in User.objects.filter(role='INTERNSHIP_ADMIN'):
                 create_notification(
@@ -274,6 +281,7 @@ class FinalGradeView(APIView):
         else:
             qs = FinalGrade.objects.all()
         return Response(FinalGradeSerializer(qs, many=True).data)            
+
 class FinalGradeCreateView(APIView):
     """POST/grades/create/
     Academic supervisor submits the final grade for a student.
@@ -378,6 +386,7 @@ class RegisterView(APIView):
                 }
             }, status=201)
         return Response({'success': False, 'errors': s.errors}, status=400)
+
 #this first view is for the user to request for the link to reset their password   
 class RequestPasswordResetView(APIView):
     permission_classes = [AllowAny]
@@ -421,6 +430,7 @@ class RequestPasswordResetView(APIView):
                 'success': True, 
                 'message': 'A reset link has been sent to your email check'
             }, status=200)
+
 #this view is for the user to actually change their password 
 #after they click the link in their email they rea then directed to apgec
 #where they can change their password
@@ -457,11 +467,12 @@ class ConfirmPasswordResetView(APIView):
     
 
 class NotificationListView(APIView):
-    permission_classes = [IsAuthenticated ]
+    permission_classes = [IsAuthenticated]
     def get(self, request):
         qs = request.user.notifications.all()
         return Response(NotificationSerializer(qs, many=True).data)
-    # Handles marking a single notification as read.
+
+# Handles marking a single notification as read.
 # Only the owner of the notification can mark it — we scope the lookup to
 # request.user.notifications so a user cannot mark someone else's notification
 class NotificationDetailView(APIView):
@@ -483,7 +494,7 @@ class NotificationDetailView(APIView):
     
 class PublishGradeView(APIView):
     permission_classes = [IsAuthenticated]
-    def post (self,request, pk):
+    def post(self, request, pk):
         if request.user.role != 'INTERNSHIP_ADMIN':
             return Response({'error':'Admin Only'}, status=403)
         try:
@@ -501,13 +512,15 @@ class PublishGradeView(APIView):
             placement.student,
                 f"Your final grade has been published. Score: {grade.score} ({grade.grade_letter})"
             )
-        return Response (FinalGradeSerializer(grade).data)
-    # Allows an authenticated user to raise a flag on a placement or log.
-    # Flags are used to escalate concerns to the internship admin.
-    # IMPORTANT: `permission_classes` must be spelled exactly right — DRF only
-    # recognises this specific attribute name. A typo like `permision_classes`
-    # (one s) is silently ignored, leaving the endpoint completely unprotected
-    # so anyone on the internet could POST flags without logging in.
+        return Response(FinalGradeSerializer(grade).data)
+
+
+# Allows an authenticated user to raise a flag on a placement or log.
+# Flags are used to escalate concerns to the internship admin.
+# IMPORTANT: `permission_classes` must be spelled exactly right — DRF only
+# recognises this specific attribute name. A typo like `permision_classes`
+# (one s) is silently ignored, leaving the endpoint completely unprotected
+# so anyone on the internet could POST flags without logging in.
 class FlagCreateView(APIView):
     permission_classes = [IsAuthenticated]
     # was: permission_classes (typo - endpoint was unprotected)
@@ -520,7 +533,21 @@ class FlagCreateView(APIView):
             s.save(raised_by=request.user)
             return Response(s.data, status=201)
         return Response(s.errors, status=400)
-    
+
+
+# B-1: FlagListView — GET /flags/list/ returns all flags to the internship admin
+class FlagListView(APIView):
+    """GET /flags/list/ — returns all flags to the internship admin."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Only the admin should see all flags
+        if request.user.role != 'INTERNSHIP_ADMIN':
+            return Response({'error': 'Admin only'}, status=403)
+        # select_related reduces N+1 queries for student and raised_by
+        qs = Flag.objects.select_related('student', 'raised_by').all()
+        return Response(FlagSerializer(qs, many=True).data)
+
 
 class UserListView(APIView):
     permission_classes = [IsAuthenticated]

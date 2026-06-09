@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getUser, logOut, getPlacements, updatePlacement, createPlacement } from '../services/api';
+import {
+  getUser, logOut, getPlacements, updatePlacement, createPlacement,
+  getUsers, publishGrade, getGrades, getFlags,
+} from '../services/api';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import './AdminDashboard.css';
 
@@ -25,22 +28,42 @@ export default function AdminDashboard() {
   const [formMsg, setFormMsg] = useState('');
   const [newPlacement, setNewPlacement] = useState(emptyPlacement);
 
+  const [students, setStudents] = useState([]);
+  const [wps, setWps] = useState([]);
+  const [academics, setAcademics] = useState([]);
+  const [grades, setGrades] = useState([]);
+  const [flags, setFlags] = useState([]);
+  const [gradeMsg, setGradeMsg] = useState('');
+
   useEffect(() => {
-    getPlacements()
-      .then((data) => {
-        const placementsArray = data.results ?? data;
+    Promise.all([
+      getPlacements(),
+      getUsers('STUDENT'),
+      getUsers('WORKPLACE_SUPERVISOR'),
+      getUsers('ACADEMIC_SUPERVISOR'),
+      getGrades(),
+      getFlags(),
+    ])
+      .then(([pData, sData, wData, aData, gData, fData]) => {
+        const placementsArray = Array.isArray(pData) ? pData : pData.results ?? [];
         setPlacements(placementsArray);
         if (Array.isArray(placementsArray)) {
-          const pending = placementsArray.filter((p) => p.status === 'Pending').length;
-          const active = placementsArray.filter((p) => p.status === 'Active').length;
-          const completed = placementsArray.filter((p) => p.status === 'Completed').length;
-          const rejected = placementsArray.filter((p) => p.status === 'Rejected').length;
-          setStats({ pending, active, completed, rejected });
+          setStats({
+            pending:   placementsArray.filter(p => p.status === 'Pending').length,
+            active:    placementsArray.filter(p => p.status === 'Active').length,
+            completed: placementsArray.filter(p => p.status === 'Completed').length,
+            rejected:  placementsArray.filter(p => p.status === 'Rejected').length,
+          });
         }
+        setStudents(Array.isArray(sData) ? sData : sData.results ?? []);
+        setWps(      Array.isArray(wData) ? wData : wData.results ?? []);
+        setAcademics(Array.isArray(aData) ? aData : aData.results ?? []);
+        setGrades(   Array.isArray(gData) ? gData : gData.results ?? []);
+        setFlags(    Array.isArray(fData) ? fData : fData.results ?? []);
       })
-      .catch((err) => {
-        console.error('Failed to fetch placements', err);
-        setError('Could not load placements. Please refresh.');
+      .catch(err => {
+        console.error('Failed to fetch admin data', err);
+        setError('Could not load dashboard. Please refresh.');
       })
       .finally(() => setLoading(false));
   }, []);
@@ -48,10 +71,10 @@ export default function AdminDashboard() {
   const handleActivate = (id) => {
     updatePlacement(id, { status: 'Active' })
       .then(() => {
-        setPlacements((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, status: 'Active' } : p))
+        setPlacements(prev =>
+          prev.map(p => (p.id === id ? { ...p, status: 'Active' } : p))
         );
-        setStats((prev) => {
+        setStats(prev => {
           if (!prev) return prev;
           return {
             ...prev,
@@ -60,7 +83,26 @@ export default function AdminDashboard() {
           };
         });
       })
-      .catch((err) => console.error('Failed to update placement', err));
+      .catch(err => console.error('Failed to update placement', err));
+  };
+
+  const handlePublish = async (gradeId) => {
+    try {
+      await publishGrade(gradeId);
+      setGradeMsg('Grade published successfully!');
+      const fresh = await getGrades();
+      setGrades(Array.isArray(fresh) ? fresh : fresh.results ?? []);
+      setPlacements(prev =>
+        prev.map(p =>
+          p.final_grade?.id === gradeId
+            ? { ...p, final_grade: { ...p.final_grade, published: true } }
+            : p
+        )
+      );
+      setTimeout(() => setGradeMsg(''), 3000);
+    } catch (err) {
+      setGradeMsg('Publish failed: ' + (err.message || 'Please try again.'));
+    }
   };
 
   const handleLogout = () => {
@@ -69,19 +111,19 @@ export default function AdminDashboard() {
   };
 
   const handleFormChange = (e) => {
-    setNewPlacement((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    setNewPlacement(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const handleCreatePlacement = async () => {
     setFormMsg('');
     if (!newPlacement.student_id || !newPlacement.company_name.trim()) {
-      setFormMsg('Error: Student ID and company name are required.');
+      setFormMsg('Error: Select a student and enter the company name.');
       return;
     }
     try {
       const created = await createPlacement(newPlacement);
-      setPlacements((prev) => [created, ...prev]);
-      setStats((prev) => {
+      setPlacements(prev => [created, ...prev]);
+      setStats(prev => {
         if (!prev) return { pending: 1, active: 0, completed: 0, rejected: 0 };
         return { ...prev, pending: prev.pending + 1 };
       });
@@ -99,11 +141,11 @@ export default function AdminDashboard() {
   const StatsPanel = () => {
     if (!stats) return null;
     const pieData = [
-      { name: 'Pending', value: stats.pending },
-      { name: 'Active', value: stats.active },
+      { name: 'Pending',   value: stats.pending },
+      { name: 'Active',    value: stats.active },
       { name: 'Completed', value: stats.completed },
-      { name: 'Rejected', value: stats.rejected },
-    ].filter((d) => d.value > 0);
+      { name: 'Rejected',  value: stats.rejected },
+    ].filter(d => d.value > 0);
 
     return (
       <div className="admin-stats-panel">
@@ -114,8 +156,16 @@ export default function AdminDashboard() {
             <span className="admin-kpi-label">Placements</span>
           </div>
           <div className="admin-kpi-card">
-            <span className="admin-kpi-val">{stats.pending + stats.active + stats.completed + stats.rejected}</span>
-            <span className="admin-kpi-label">Total</span>
+            <span className="admin-kpi-val">{students.length}</span>
+            <span className="admin-kpi-label">Students</span>
+          </div>
+          <div className="admin-kpi-card">
+            <span className="admin-kpi-val">{wps.length}</span>
+            <span className="admin-kpi-label">Workplace Supervisors</span>
+          </div>
+          <div className="admin-kpi-card">
+            <span className="admin-kpi-val">{academics.length}</span>
+            <span className="admin-kpi-label">Academic Supervisors</span>
           </div>
         </div>
         {pieData.length > 0 ? (
@@ -139,14 +189,16 @@ export default function AdminDashboard() {
             </PieChart>
           </ResponsiveContainer>
         ) : (
-          <p className="admin-empty">No placement records yet. Create the first placement using the + New Placement button.</p>
+          <p className="admin-empty">
+            No placement records yet. Create the first placement using the + New Placement button.
+          </p>
         )}
       </div>
     );
   };
 
   if (loading) return <div className="admin-loading">Loading admin dashboard...</div>;
-  if (error) return <div className="admin-error">{error}</div>;
+  if (error)   return <div className="admin-error">{error}</div>;
 
   return (
     <div className="ad-root">
@@ -158,7 +210,9 @@ export default function AdminDashboard() {
       </div>
 
       {formMsg && (
-        <div className={formMsg.startsWith('Error') ? 'admin-error' : 'admin-msg'}>{formMsg}</div>
+        <div className={formMsg.startsWith('Error') ? 'admin-error' : 'admin-msg'}>
+          {formMsg}
+        </div>
       )}
 
       <button className="admin-add-btn" onClick={() => setShowForm(!showForm)}>
@@ -169,13 +223,18 @@ export default function AdminDashboard() {
         <div className="admin-form-card">
           <h3>Create Placement</h3>
           <div className="admin-field">
-            <label>Student ID</label>
-            <input
+            <label>Student</label>
+            <select
               name="student_id"
               value={newPlacement.student_id}
               onChange={handleFormChange}
-              placeholder="Enter student ID (number)"
-            />
+              title="Select the student who will be attached to this internship placement."
+            >
+              <option value="">Select student</option>
+              {students.map(s => (
+                <option key={s.id} value={s.id}>{s.username} ({s.email})</option>
+              ))}
+            </select>
           </div>
           <div className="admin-field">
             <label>Company Name</label>
@@ -183,34 +242,56 @@ export default function AdminDashboard() {
               name="company_name"
               value={newPlacement.company_name}
               onChange={handleFormChange}
-              placeholder="e.g., Tech Solutions Ltd"
+              title="Enter the company or organization where the student is placed."
             />
           </div>
           <div className="admin-field">
             <label>Start Date</label>
-            <input type="date" name="start_date" value={newPlacement.start_date} onChange={handleFormChange} />
+            <input
+              type="date"
+              name="start_date"
+              value={newPlacement.start_date}
+              onChange={handleFormChange}
+              title="Choose the first day of the internship."
+            />
           </div>
           <div className="admin-field">
             <label>End Date</label>
-            <input type="date" name="end_date" value={newPlacement.end_date} onChange={handleFormChange} />
+            <input
+              type="date"
+              name="end_date"
+              value={newPlacement.end_date}
+              onChange={handleFormChange}
+              title="Choose the last day of the internship. It must be after the start date."
+            />
           </div>
           <div className="admin-field">
-            <label>Workplace Supervisor ID (optional)</label>
-            <input
+            <label>Workplace Supervisor</label>
+            <select
               name="workplace_supervisor_id"
               value={newPlacement.workplace_supervisor_id}
               onChange={handleFormChange}
-              placeholder="Enter user ID"
-            />
+              title="Select the workplace supervisor assigned to this student."
+            >
+              <option value="">Not assigned yet</option>
+              {wps.map(s => (
+                <option key={s.id} value={s.id}>{s.username} ({s.email})</option>
+              ))}
+            </select>
           </div>
           <div className="admin-field">
-            <label>Academic Supervisor ID (optional)</label>
-            <input
+            <label>Academic Supervisor</label>
+            <select
               name="academic_supervisor_id"
               value={newPlacement.academic_supervisor_id}
               onChange={handleFormChange}
-              placeholder="Enter user ID"
-            />
+              title="Select the academic supervisor assigned to this student."
+            >
+              <option value="">Not assigned yet</option>
+              {academics.map(s => (
+                <option key={s.id} value={s.id}>{s.username} ({s.email})</option>
+              ))}
+            </select>
           </div>
           <button className="admin-submit-btn" onClick={handleCreatePlacement}>
             Create
@@ -218,7 +299,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      <StatsPanel />
+      {stats && <StatsPanel />}
 
       <div className="ad-table-wrap">
         <table className="ad-table">
@@ -230,15 +311,12 @@ export default function AdminDashboard() {
               <th>Academic Supervisor</th>
               <th>Workplace Supervisor</th>
               <th>Action</th>
+              <th>Grade</th>
             </tr>
           </thead>
           <tbody>
             {placements.length === 0 ? (
-              <tr>
-                <td colSpan="6" className="admin-empty">
-                  No placements found.
-                </td>
-              </tr>
+              <tr><td colSpan="7" className="admin-empty">No placements found.</td></tr>
             ) : (
               placements.map((p, i) => (
                 <tr key={p.id} className={i % 2 === 0 ? 'ad-row-alt' : ''}>
@@ -252,11 +330,14 @@ export default function AdminDashboard() {
                   <td>{p.academic_supervisor?.username || '—'}</td>
                   <td>{p.workplace_supervisor?.username || '—'}</td>
                   <td>
-                    {p.status === 'Pending' && (
-                      <button className="ad-activate-btn" onClick={() => handleActivate(p.id)}>
-                        Set Active
-                      </button>
-                    )}
+                    {p.status === 'Pending'
+                      ? <button className="ad-activate-btn" onClick={() => handleActivate(p.id)}>Set Active</button>
+                      : '—'}
+                  </td>
+                  <td>
+                    {p.final_grade && !p.final_grade.published
+                      ? <button className="ad-activate-btn" onClick={() => handlePublish(p.final_grade.id)}>Publish Grade</button>
+                      : p.final_grade?.published ? 'Published' : '—'}
                   </td>
                 </tr>
               ))
@@ -264,6 +345,78 @@ export default function AdminDashboard() {
           </tbody>
         </table>
       </div>
+
+      <section style={{ marginTop: 32 }}>
+        <h2>Unpublished Grades</h2>
+        {gradeMsg && (
+          <div className={gradeMsg.startsWith('Publish failed') ? 'admin-error' : 'admin-msg'}>
+            {gradeMsg}
+          </div>
+        )}
+        {grades.filter(g => !g.published).length === 0 ? (
+          <p className="admin-empty">All grades have been published.</p>
+        ) : (
+          grades.filter(g => !g.published).map(g => (
+            <div
+              key={g.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                padding: '8px 0',
+                borderBottom: '1px solid #D6E4F7',
+              }}
+            >
+              <span>{g.placement?.student?.username ?? 'Student'}</span>
+              <span>{g.grade_letter} — {g.score}/100</span>
+              {g.remarks && <span style={{ color: '#6B7280', fontSize: '0.85rem' }}>{g.remarks}</span>}
+              <button className="ad-activate-btn" onClick={() => handlePublish(g.id)}>Publish</button>
+            </div>
+          ))
+        )}
+      </section>
+
+      <section style={{ marginTop: 32 }}>
+        <h2>Flagged Issues</h2>
+        {flags.length === 0 ? (
+          <p className="admin-empty">No flags have been raised.</p>
+        ) : (
+          <div className="ad-table-wrap">
+            <table className="ad-table">
+              <thead>
+                <tr>
+                  <th>Raised By</th>
+                  <th>Student</th>
+                  <th>Reason</th>
+                  <th>Details</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {flags.map((f, i) => (
+                  <tr key={f.id} className={i % 2 === 0 ? 'ad-row-alt' : ''}>
+                    <td>{f.raised_by?.username ?? '—'}</td>
+                    <td>{f.placement?.student?.username ?? f.student?.username ?? '—'}</td>
+                    <td>{f.reason ?? '—'}</td>
+                    <td style={{ maxWidth: 260, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                      {f.details ?? f.description ?? '—'}
+                    </td>
+                    <td>
+                      {f.created_at ? new Date(f.created_at).toLocaleDateString() : '—'}
+                    </td>
+                    <td>
+                      <span className={`ad-badge ad-badge-${f.resolved ? 'completed' : 'pending'}`}>
+                        {f.resolved ? 'Resolved' : 'Open'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

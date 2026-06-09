@@ -35,7 +35,8 @@ from internship.views import (
     NotificationListView, NotificationDetailView, FlagCreateView,
     PublishGradeView,
     UserListView,
-    ProfileView
+    ProfileView,
+    FlagListView,
 )
 #this is for admin as always
 urlpatterns = [
@@ -57,6 +58,10 @@ urlpatterns = [
     path('logs/', WeeklyLogListView.as_view(), name='weeklylog-list'),
     #and their details
     path('logs/<int:pk>/', WeeklyLogDetailView.as_view(), name='weeklylog-detail'),
+
+    #for the flags
+    path('flags/', FlagCreateView.as_view(), name='flag-create'), # POST (existing)
+    path('flags/list/', FlagListView.as_view(), name='flag-list'), # GET (new)
     
 
 
