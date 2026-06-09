@@ -74,7 +74,6 @@ class UserSerializer(serializers.ModelSerializer):
 
         #im not including the password field coz this would expose it 
 
-#finally final grade serializers
 # MOVED UP: FinalGradeSerializer must be defined before PlacementSerializer
 # because PlacementSerializer references it as a nested field.
 # Python reads top-to-bottom — using a class before it is defined causes a NameError.
@@ -108,8 +107,8 @@ class PlacementSerializer(serializers.ModelSerializer):
     student = UserSerializer(read_only=True) 
     workplace_supervisor = UserSerializer(read_only=True)
     academic_supervisor = UserSerializer(read_only=True)
-    final_grade = FinalGradeSerializer(read_only=True) # Custom method field to include final grade details
-
+    # FIX: was FinalGradesSerializer (extra 's') — caused NameError on import
+    final_grade = FinalGradeSerializer(read_only=True)
 
     # WRITE-ONLY ID fields — accepted in POST/PUT/PATCH requests
     # source='student' tells DRF to map student_id onto the student field of the model

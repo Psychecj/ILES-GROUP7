@@ -155,6 +155,8 @@ export const updateEvaluation = (id, data) => apiFetch(`/evaluations/${id}/`, {
   body: JSON.stringify(data)
 });
 
+export const publishGrade = (id) => apiFetch(`/grades/${id}/publish/`, { method: 'POST' });
+
 // --- Notifications ---
 export const getNotifications = () => apiFetch('/notifications/');
 export const markNotificationRead = (id) => apiFetch(`/notifications/${id}/`, {
@@ -167,23 +169,21 @@ export const createFlag = (data) => apiFetch('/flags/', {
   method: 'POST',
   body: JSON.stringify(data)
 });
-
-export const publishGrade = (id) =>
-apiFetch(`/grades/${id}/publish/`, { method: 'POST' });
-
-// Add a "wake up" ping when the app loads
-export const pingServer = () => 
-  fetch(`${BASE_URL}/login/`, { method: 'GET' }).catch(() => {});
-
+export const getFlags = () => apiFetch('/flags/list/');
 
 // --- Profile ---
 export const getProfile = () => apiFetch('/profile/');
 export const updateProfile = (data) => {
-    const formData = new FormData();
-    Object.keys(data).forEach(key => {
-        if (data[key] !== null && data[key] !== undefined) {
-            formData.append(key, data[key]);
-        }
-    });
-    return apiFetch('/profile/', { method: 'PATCH', body: formData });
+  const formData = new FormData();
+  Object.keys(data).forEach(key => {
+    if (data[key] !== null && data[key] !== undefined) {
+      formData.append(key, data[key]);
+    }
+  });
+  return apiFetch('/profile/', { method: 'PATCH', body: formData });
 };
+
+// --- Utilities ---
+// Add a "wake up" ping when the app loads
+export const pingServer = () =>
+  fetch(`${BASE_URL}/login/`, { method: 'GET' }).catch(() => {});
