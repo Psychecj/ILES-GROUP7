@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-// Step 1: extended imports — added publishGrade + getGrades + getFlags
 import {
   getUser, logOut, getPlacements, updatePlacement, createPlacement,
   getUsers, publishGrade, getGrades, getFlags,
@@ -8,7 +7,6 @@ import {
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import './AdminDashboard.css';
 
-// emptyPlacement at module scope (used in useState initial value)
 const emptyPlacement = {
   student_id: '',
   company_name: '',
@@ -29,20 +27,14 @@ export default function AdminDashboard() {
   const [showForm, setShowForm] = useState(false);
   const [formMsg, setFormMsg] = useState('');
   const [newPlacement, setNewPlacement] = useState(emptyPlacement);
-  const [students, setStudents] = useState([]);
-  const [wps, setWps] = useState([]);
-  const [academics, setAcademics] = useState([]);
 
   const [students, setStudents] = useState([]);
   const [wps, setWps] = useState([]);
   const [academics, setAcademics] = useState([]);
-
-  // Step 2: grades + flags state
   const [grades, setGrades] = useState([]);
   const [flags, setFlags] = useState([]);
   const [gradeMsg, setGradeMsg] = useState('');
 
-  // Step 3: unified useEffect — placements, users, grades, flags
   useEffect(() => {
     Promise.all([
       getPlacements(),
@@ -63,7 +55,7 @@ export default function AdminDashboard() {
             rejected:  placementsArray.filter(p => p.status === 'Rejected').length,
           });
         }
-        setStudents( Array.isArray(sData) ? sData : sData.results ?? []);
+        setStudents(Array.isArray(sData) ? sData : sData.results ?? []);
         setWps(      Array.isArray(wData) ? wData : wData.results ?? []);
         setAcademics(Array.isArray(aData) ? aData : aData.results ?? []);
         setGrades(   Array.isArray(gData) ? gData : gData.results ?? []);
@@ -74,24 +66,7 @@ export default function AdminDashboard() {
         setError('Could not load dashboard. Please refresh.');
       })
       .finally(() => setLoading(false));
-
-    getUsers('STUDENT').then(d => setStudents(Array.isArray(d) ? d : d.results ?? [])).catch(() => {});
-    getUsers('WORKPLACE_SUPERVISOR').then(d => setWps(Array.isArray(d) ? d : d.results ?? [])).catch(() => {});
-    getUsers('ACADEMIC_SUPERVISOR').then(d => setAcademics(Array.isArray(d) ? d : d.results ?? [])).catch(() => {});
   }, []);
-
-  const handlePublish = async (gradeId) => {
-    try {
-      await publishGrade(gradeId);
-      setPlacements(prev => prev.map(p =>
-        p.final_grade?.id === gradeId
-          ? { ...p, final_grade: { ...p.final_grade, published: true } }
-          : p
-      ));
-    } catch (err) {
-      setError('Publish failed: ' + err.message);
-    }
-  };
 
   const handleActivate = (id) => {
     updatePlacement(id, { status: 'Active' })
@@ -101,21 +76,22 @@ export default function AdminDashboard() {
         );
         setStats(prev => {
           if (!prev) return prev;
-          return { ...prev, pending: prev.pending - 1, active: prev.active + 1 };
+          return {
+            ...prev,
+            pending: prev.pending - 1,
+            active: prev.active + 1,
+          };
         });
       })
       .catch(err => console.error('Failed to update placement', err));
   };
 
-  // Step 4: handlePublish — calls publishGrade, refreshes grades list
   const handlePublish = async (gradeId) => {
     try {
-      await publishGrade(gradeId); // POST /grades/<id>/publish/
+      await publishGrade(gradeId);
       setGradeMsg('Grade published successfully!');
-      // Refresh grades list so the panel reflects the change
       const fresh = await getGrades();
       setGrades(Array.isArray(fresh) ? fresh : fresh.results ?? []);
-      // Also mark the placement row as published in local state
       setPlacements(prev =>
         prev.map(p =>
           p.final_grade?.id === gradeId
@@ -317,13 +293,14 @@ export default function AdminDashboard() {
               ))}
             </select>
           </div>
-          <button className="admin-submit-btn" onClick={handleCreatePlacement}>Create</button>
+          <button className="admin-submit-btn" onClick={handleCreatePlacement}>
+            Create
+          </button>
         </div>
       )}
 
       {stats && <StatsPanel />}
 
-      {/* Placements table */}
       <div className="ad-table-wrap">
         <table className="ad-table">
           <thead>
@@ -340,34 +317,35 @@ export default function AdminDashboard() {
           <tbody>
             {placements.length === 0 ? (
               <tr><td colSpan="7" className="admin-empty">No placements found.</td></tr>
-            ) : placements.map((p, i) => (
-              <tr key={p.id} className={i % 2 === 0 ? 'ad-row-alt' : ''}>
-                <td>{p.student?.username || '—'}</td>
-                <td>{p.company_name}</td>
-                <td>
-                  <span className={`ad-badge ad-badge-${String(p.status).toLowerCase()}`}>
-                    {p.status}
-                  </span>
-                </td>
-                <td>{p.academic_supervisor?.username || '—'}</td>
-                <td>{p.workplace_supervisor?.username || '—'}</td>
-                <td>
-                  {p.status === 'Pending'
-                    ? <button className="ad-activate-btn" onClick={() => handleActivate(p.id)}>Set Active</button>
-                    : '—'}
-                </td>
-                <td>
-                  {p.final_grade && !p.final_grade.published
-                    ? <button className="ad-activate-btn" onClick={() => handlePublish(p.final_grade.id)}>Publish Grade</button>
-                    : p.final_grade?.published ? 'Published' : '—'}
-                </td>
-              </tr>
-            ))}
+            ) : (
+              placements.map((p, i) => (
+                <tr key={p.id} className={i % 2 === 0 ? 'ad-row-alt' : ''}>
+                  <td>{p.student?.username || '—'}</td>
+                  <td>{p.company_name}</td>
+                  <td>
+                    <span className={`ad-badge ad-badge-${String(p.status).toLowerCase()}`}>
+                      {p.status}
+                    </span>
+                  </td>
+                  <td>{p.academic_supervisor?.username || '—'}</td>
+                  <td>{p.workplace_supervisor?.username || '—'}</td>
+                  <td>
+                    {p.status === 'Pending'
+                      ? <button className="ad-activate-btn" onClick={() => handleActivate(p.id)}>Set Active</button>
+                      : '—'}
+                  </td>
+                  <td>
+                    {p.final_grade && !p.final_grade.published
+                      ? <button className="ad-activate-btn" onClick={() => handlePublish(p.final_grade.id)}>Publish Grade</button>
+                      : p.final_grade?.published ? 'Published' : '—'}
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
 
-      {/* Step 5: Unpublished Grades panel */}
       <section style={{ marginTop: 32 }}>
         <h2>Unpublished Grades</h2>
         {gradeMsg && (
@@ -392,18 +370,12 @@ export default function AdminDashboard() {
               <span>{g.placement?.student?.username ?? 'Student'}</span>
               <span>{g.grade_letter} — {g.score}/100</span>
               {g.remarks && <span style={{ color: '#6B7280', fontSize: '0.85rem' }}>{g.remarks}</span>}
-              <button
-                className="ad-activate-btn"
-                onClick={() => handlePublish(g.id)}
-              >
-                Publish
-              </button>
+              <button className="ad-activate-btn" onClick={() => handlePublish(g.id)}>Publish</button>
             </div>
           ))
         )}
       </section>
 
-      {/* Step 6: Flags panel */}
       <section style={{ marginTop: 32 }}>
         <h2>Flagged Issues</h2>
         {flags.length === 0 ? (
@@ -431,14 +403,10 @@ export default function AdminDashboard() {
                       {f.details ?? f.description ?? '—'}
                     </td>
                     <td>
-                      {f.created_at
-                        ? new Date(f.created_at).toLocaleDateString()
-                        : '—'}
+                      {f.created_at ? new Date(f.created_at).toLocaleDateString() : '—'}
                     </td>
                     <td>
-                      <span
-                        className={`ad-badge ad-badge-${f.resolved ? 'completed' : 'pending'}`}
-                      >
+                      <span className={`ad-badge ad-badge-${f.resolved ? 'completed' : 'pending'}`}>
                         {f.resolved ? 'Resolved' : 'Open'}
                       </span>
                     </td>
@@ -449,7 +417,6 @@ export default function AdminDashboard() {
           </div>
         )}
       </section>
-
     </div>
   );
 }
