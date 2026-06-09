@@ -26,10 +26,12 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [stats, setStats] = useState(null);
-
   const [showForm, setShowForm] = useState(false);
   const [formMsg, setFormMsg] = useState('');
   const [newPlacement, setNewPlacement] = useState(emptyPlacement);
+  const [students, setStudents] = useState([]);
+  const [wps, setWps] = useState([]);
+  const [academics, setAcademics] = useState([]);
 
   const [students, setStudents] = useState([]);
   const [wps, setWps] = useState([]);
@@ -72,7 +74,24 @@ export default function AdminDashboard() {
         setError('Could not load dashboard. Please refresh.');
       })
       .finally(() => setLoading(false));
+
+    getUsers('STUDENT').then(d => setStudents(Array.isArray(d) ? d : d.results ?? [])).catch(() => {});
+    getUsers('WORKPLACE_SUPERVISOR').then(d => setWps(Array.isArray(d) ? d : d.results ?? [])).catch(() => {});
+    getUsers('ACADEMIC_SUPERVISOR').then(d => setAcademics(Array.isArray(d) ? d : d.results ?? [])).catch(() => {});
   }, []);
+
+  const handlePublish = async (gradeId) => {
+    try {
+      await publishGrade(gradeId);
+      setPlacements(prev => prev.map(p =>
+        p.final_grade?.id === gradeId
+          ? { ...p, final_grade: { ...p.final_grade, published: true } }
+          : p
+      ));
+    } catch (err) {
+      setError('Publish failed: ' + err.message);
+    }
+  };
 
   const handleActivate = (id) => {
     updatePlacement(id, { status: 'Active' })
@@ -144,6 +163,7 @@ export default function AdminDashboard() {
   const COLORS = ['#FBBF24', '#60A5FA', '#34D399', '#F87171'];
 
   const StatsPanel = () => {
+    if (!stats) return null;
     const pieData = [
       { name: 'Pending',   value: stats.pending },
       { name: 'Active',    value: stats.active },

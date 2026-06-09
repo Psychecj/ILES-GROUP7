@@ -141,13 +141,19 @@ export default function StudentDashboard() {
       return;
     }
 
+    // Ensure placement exists and convert its id to a number (backend expects integer)
+    if (!placement || !placement.id) {
+      setErrors({ submit: "No active placement found. Please contact your administrator." });
+      return;
+    }
+
     const logData = {
       week: Number(form.week),
       description: form.description.trim(),
       hours: Number(form.hours),
       challenges: form.challenges.trim(),
       skills: form.skills.trim(),
-      placement: placement.id,
+      placement: Number(placement.id),   // ✅ FIX: convert to number
       attachment: form.attachment,
     };
 
@@ -159,7 +165,7 @@ export default function StudentDashboard() {
         await createWeeklyLog(logData);
         setSuccessMsg("Log submitted successfully!");
       }
-      await fetchDashboardData();
+      await fetchLogs();
       setForm(emptyForm);
       setEditIndex(null);
       setEditId(null);
@@ -175,7 +181,7 @@ export default function StudentDashboard() {
     try {
       await updateWeeklyLog(logId, { status: "Submitted" });
       setSuccessMsg("Log submitted for supervisor review!");
-      fetchDashboardData();
+      fetchLogs();
     } catch (err) {
       setError("Failed to submit log: " + (err.message || "Please try again."));
     }
