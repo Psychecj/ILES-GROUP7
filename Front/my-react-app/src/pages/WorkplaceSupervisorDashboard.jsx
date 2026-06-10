@@ -20,6 +20,8 @@ export default function WorkplaceSupervisorDashboard() {
     communication_skills: 5, punctuality: 5, overall_comments: ''
   });
   const [evalMsg, setEvalMsg] = useState('');
+  // FIX: moved filter state inside component, above JSX
+  const [logFilter, setLogFilter] = useState('All');
 
   useEffect(() => { fetchData(); }, []);
 
@@ -42,16 +44,14 @@ export default function WorkplaceSupervisorDashboard() {
   };
 
   const handleReview = async (logId, decision) => {
-    // Convert decision to uppercase to match backend enum (e.g., 'APPROVED' instead of 'Approved')
-    const status = decision;
     try {
       await updateWeeklyLog(logId, {
-        status: status,
+        status: decision,
         supervisor_comment: comments[logId] || ''
       });
       setLogs(prev => prev.map(l =>
         l.id === logId
-          ? { ...l, status: status, supervisor_comment: comments[logId] || '' }
+          ? { ...l, status: decision, supervisor_comment: comments[logId] || '' }
           : l
       ));
       setComments(prev => { const n = { ...prev }; delete n[logId]; return n; });
@@ -60,17 +60,16 @@ export default function WorkplaceSupervisorDashboard() {
     }
   };
 
-  // 1. Add validateEval function inside the component:
   const validateEval = () => {
     if (!evalForm.placement) return 'Please select a placement.';
-      const fields = ['technical_skills', 'communication_skills', 'punctuality'];
-      for (const f of fields) {
+    const fields = ['technical_skills', 'communication_skills', 'punctuality'];
+    for (const f of fields) {
       const v = Number(evalForm[f]);
       if (isNaN(v) || v < 0 || v > 10)
-        return `${f.replace(/_/g,' ')} must be between 0 and 10.`;
-      }
-    return null; // no error
-    };
+        return `${f.replace(/_/g, ' ')} must be between 0 and 10.`;
+    }
+    return null;
+  };
 
   const handleEvalChange = (e) => {
     const { name, value } = e.target;
@@ -78,22 +77,20 @@ export default function WorkplaceSupervisorDashboard() {
   };
 
   const handleEvalSubmit = async () => {
-    const error = validateEval();
-    if (error) {
-      setEvalMsg(error);
+    const validationError = validateEval();
+    if (validationError) {
+      setEvalMsg(validationError);
       setTimeout(() => setEvalMsg(''), 3000);
       return;
     }
     try {
-      await createEvaluation(
-        {
+      await createEvaluation({
         ...evalForm,
-        placement: Number(evalForm.placement), // ensure integer
+        placement: Number(evalForm.placement),
         technical_skills: Number(evalForm.technical_skills),
         communication_skills: Number(evalForm.communication_skills),
         punctuality: Number(evalForm.punctuality),
       });
-      
       setEvalMsg('Evaluation submitted successfully!');
       setEvalForm({
         placement: '', technical_skills: 5,
@@ -105,46 +102,15 @@ export default function WorkplaceSupervisorDashboard() {
     }
   };
 
-  // 1. Add filter state near other state declarations:
-const [logFilter, setLogFilter] = useState('All');
-// 2. Compute filtered list:
-const filteredLogs = logFilter === 'All'
-? logs
-: logs.filter(l => l.status === logFilter);
-// 3. Add the filter UI before the log cards, inside the 'logs' tab section:
-<div style={{ marginBottom: 12 }}>
-<label style={{ marginRight: 8, fontWeight: 600 }}>Filter:</label>
-{['All', 'Submitted', 'Approved', 'Rejected', 'Draft'].map(s => (
-<button
-key={s}
-onClick={() => setLogFilter(s)}
-style={{
-marginRight: 6, padding: '4px 10px', borderRadius: 12,
-border: '1px solid #A0B8D8',
-background: logFilter === s ? '#4A6FA5' : '#F0F4FF',
-color: logFilter === s ? '#fff' : '#333',
-cursor: 'pointer', fontSize: 13,
-}}
->
-{s}
-</button>
-))}
-</div>
-// 4. Replace 'logs.map' with 'filteredLogs.map' in the JSX.
-// Also guard against undefined status:
-const safeStatus = (log.status || 'draft').toLowerCase();
-// Use safeStatus in className: `ws-status ws-status-${safeStatus}`
-// 5. Show a helpful message when no logs match the filter:
-{filteredLogs.length === 0 && (
-<p style={{ color: '#6C757D', fontStyle: 'italic' }}>
-No {logFilter === 'All' ? '' : logFilter} logs found.
-</p>
-)}
-
   const handleLogout = () => {
     logOut();
     navigate('/');
   };
+
+  // FIX: computed filtered list — moved here, before return
+  const filteredLogs = logFilter === 'All'
+    ? logs
+    : logs.filter(l => l.status === logFilter);
 
   if (loading) return <div className="ws-loading">Loading...</div>;
 
@@ -168,49 +134,81 @@ No {logFilter === 'All' ? '' : logFilter} logs found.
       </aside>
 
       <main className="ws-main">
-        <h1 className="ws-title">Welcome, {user?.username || user?.email?.split('@')[0] || "Supervisor"} — Workplace Supervisor</h1>
+        <h1 className="ws-title">
+          Welcome, {user?.username || user?.email?.split('@')[0] || 'Supervisor'} — Workplace Supervisor
+        </h1>
         {error && <div className="ws-error">{error}</div>}
 
         {activeTab === 'logs' && (
           <section>
             <h2>Student Weekly Logs</h2>
-            {logs.length === 0
-              ? <p>No logs submitted yet.</p>
-              : logs.map(log => (
-                <div key={log.id} className="ws-log-card">
-                  <div className="ws-log-header">
-                    <span><strong>{log.student?.username || 'Student'}</strong></span>
-                    <span>Week {log.week}</span>
-                    <span className={`ws-status ws-status-${log.status.toLowerCase()}`}>
-                      {log.status}
-                    </span>
-                  </div>
-                  <p><strong>Description:</strong> {log.description}</p>
-                  <p><strong>Hours:</strong> {log.hours}h</p>
-                  <p><strong>Skills:</strong> {log.skills}</p>
-                  <p><strong>Challenges:</strong> {log.challenges}</p>
-                  {log.status === 'Submitted' && (
-                    <div className="ws-review-box">
-                      <textarea
-                        placeholder="Add a comment (optional)"
-                        value={comments[log.id] || ''}
-                        onChange={e => handleCommentChange(log.id, e.target.value)}
-                        rows={2}
-                        className="ws-comment"
-                      />
-                      <div className="ws-actions">
-                        <button className="ws-approve" onClick={() => handleReview(log.id, 'Approved')}>
-                          Approve
-                        </button>
-                        <button className="ws-reject" onClick={() => handleReview(log.id, 'Rejected')}>
-                          Reject
-                        </button>
-                      </div>
+
+            {/* FIX: filter buttons now inside JSX where they belong */}
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ marginRight: 8, fontWeight: 600 }}>Filter:</label>
+              {['All', 'Submitted', 'Approved', 'Rejected', 'Draft'].map(s => (
+                <button
+                  key={s}
+                  onClick={() => setLogFilter(s)}
+                  style={{
+                    marginRight: 6, padding: '4px 10px', borderRadius: 12,
+                    border: '1px solid #A0B8D8',
+                    background: logFilter === s ? '#4A6FA5' : '#F0F4FF',
+                    color: logFilter === s ? '#fff' : '#333',
+                    cursor: 'pointer', fontSize: 13,
+                  }}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+
+            {/* FIX: show message when no logs match filter */}
+            {filteredLogs.length === 0 ? (
+              <p style={{ color: '#6C757D', fontStyle: 'italic' }}>
+                No {logFilter === 'All' ? '' : logFilter} logs found.
+              </p>
+            ) : (
+              // FIX: filteredLogs.map instead of logs.map
+              filteredLogs.map(log => {
+                // FIX: guard against undefined status
+                const safeStatus = (log.status || 'draft').toLowerCase();
+                return (
+                  <div key={log.id} className="ws-log-card">
+                    <div className="ws-log-header">
+                      <span><strong>{log.student?.username || 'Student'}</strong></span>
+                      <span>Week {log.week}</span>
+                      <span className={`ws-status ws-status-${safeStatus}`}>
+                        {log.status || 'Draft'}
+                      </span>
                     </div>
-                  )}
-                </div>
-              ))
-            }
+                    <p><strong>Description:</strong> {log.description}</p>
+                    <p><strong>Hours:</strong> {log.hours}h</p>
+                    <p><strong>Skills:</strong> {log.skills}</p>
+                    <p><strong>Challenges:</strong> {log.challenges}</p>
+                    {log.status === 'Submitted' && (
+                      <div className="ws-review-box">
+                        <textarea
+                          placeholder="Add a comment (optional)"
+                          value={comments[log.id] || ''}
+                          onChange={e => handleCommentChange(log.id, e.target.value)}
+                          rows={2}
+                          className="ws-comment"
+                        />
+                        <div className="ws-actions">
+                          <button className="ws-approve" onClick={() => handleReview(log.id, 'Approved')}>
+                            Approve
+                          </button>
+                          <button className="ws-reject" onClick={() => handleReview(log.id, 'Rejected')}>
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </section>
         )}
 
