@@ -6,12 +6,12 @@ import {
   updateWeeklyLog,
   logOut,
   getUser,
+  saveUser,
   getPlacements,
   getGrades,
   getNotifications,
   markNotificationRead,
   updateProfile,
-  saveUser,
   getProfile,
 } from "../services/api";
 import "./StudentDashboard.css";
@@ -29,8 +29,10 @@ const emptyForm = {
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
-  const user = getUser();
-  const displayName = user?.username || user?.email?.split("@")[0] || "Student";
+
+  // FIX (welcome name): don't read user once at module level — store in state
+  // so that when we fetch the real profile and call saveUser, the header re-renders.
+  const [currentUser, setCurrentUser] = useState(getUser());
 
   const [logs, setLogs] = useState([]);
   const [placement, setPlacement] = useState(null);
@@ -46,7 +48,7 @@ export default function StudentDashboard() {
   const [notifications, setNotifications] = useState([]);
   const [showNotifs, setShowNotifs] = useState(false);
   const [activeTab, setActiveTab] = useState("logs"); // 'logs' | 'profile' | 'reports'
-  const [profileForm, setProfileForm] = useState({ username: user?.username || "", profile_picture: null });
+  const [profileForm, setProfileForm] = useState({ username: currentUser?.username || "", profile_picture: null });
   const [profileMsg, setProfileMsg] = useState("");
   const [profilePicUrl, setProfilePicUrl] = useState("");
   const [expandedLog, setExpandedLog] = useState(null);
@@ -55,14 +57,22 @@ export default function StudentDashboard() {
   useEffect(() => {
     fetchDashboardData();
     getNotifications().then(setNotifications).catch(() => setNotifications([]));
-  }, []);
 
-  //runs once when the page loads
-  //if login takes more than 4 seconds, the button text changes to let the user know it's not frozen — it's just the server starting up
+    // FIX (welcome name): fetch real profile on mount so username is always correct.
+    // The login response may only return email; /profile/ returns the full user object.
+    getProfile()
+      .then((data) => {
+        const merged = { ...getUser(), ...data };
+        saveUser(merged);
+        setCurrentUser(merged);
+        setProfileForm((p) => ({ ...p, username: data.username || p.username }));
+        setProfilePicUrl(data.profile_picture || "");
+      })
+      .catch(() => {}); // silently ignore — dashboard still works with cached data
+  }, []);
 
   const unread = notifications.filter((n) => !n.is_read).length;
 
-  // FIX: Removed duplicate handleNotifClick — keeping single definition here
   const handleNotifClick = async (id) => {
     await markNotificationRead(id);
     setNotifications((prev) =>
@@ -70,7 +80,6 @@ export default function StudentDashboard() {
     );
   };
 
-  // FIX: Renamed fetchLogs → fetchDashboardData to match all call sites
   const fetchDashboardData = async () => {
     setLoading(true);
     setError("");
@@ -96,10 +105,8 @@ export default function StudentDashboard() {
     setActiveTab(tab);
     if (tab === "profile") {
       try {
-        const data = await getProfile(); // GET /profile/
-        // Pre-fill the form with saved username
+        const data = await getProfile();
         setProfileForm({ username: data.username, profile_picture: null });
-        // Store the existing picture URL for preview
         setProfilePicUrl(data.profile_picture || "");
       } catch (err) {
         console.error("Could not load profile:", err);
@@ -141,7 +148,6 @@ export default function StudentDashboard() {
       return;
     }
 
-    // Ensure placement exists and convert its id to a number (backend expects integer)
     if (!placement || !placement.id) {
       setErrors({ submit: "No active placement found. Please contact your administrator." });
       return;
@@ -153,7 +159,7 @@ export default function StudentDashboard() {
       hours: Number(form.hours),
       challenges: form.challenges.trim(),
       skills: form.skills.trim(),
-      placement: Number(placement.id),   // ✅ FIX: convert to number
+      placement: Number(placement.id),
       attachment: form.attachment,
     };
 
@@ -165,7 +171,8 @@ export default function StudentDashboard() {
         await createWeeklyLog(logData);
         setSuccessMsg("Log submitted successfully!");
       }
-      await fetchLogs();
+      // FIX: was fetchLogs() (undefined) — corrected to fetchDashboardData()
+      await fetchDashboardData();
       setForm(emptyForm);
       setEditIndex(null);
       setEditId(null);
@@ -181,7 +188,8 @@ export default function StudentDashboard() {
     try {
       await updateWeeklyLog(logId, { status: "Submitted" });
       setSuccessMsg("Log submitted for supervisor review!");
-      fetchLogs();
+      // FIX: was fetchLogs() (undefined) — corrected to fetchDashboardData()
+      fetchDashboardData();
     } catch (err) {
       setError("Failed to submit log: " + (err.message || "Please try again."));
     }
@@ -248,8 +256,6 @@ export default function StudentDashboard() {
     );
   };
 
-  // Moved logs.map() inside <tbody> where it belongs, completed expandable row,
-  // and removed the misplaced block that was sitting outside the function body.
   const renderLogs = () => (
     <>
       {showForm && (
@@ -366,36 +372,27 @@ export default function StudentDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {/* FIX: logs.map() moved inside <tbody> where it belongs */}
                 {logs.map((log, i) => (
                   <>
-                    {/* Main row */}
                     <tr key={log.id || i}>
                       <td>{log.week}</td>
                       <td>{log.hours}h</td>
                       <td>
-                        <span
-                          className={`sd-status sd-status-${(log.status || "pending").toLowerCase()}`}
-                        >
+                        <span className={`sd-status sd-status-${(log.status || "pending").toLowerCase()}`}>
                           {log.status || "Pending"}
                         </span>
                       </td>
                       <td>
-                        {/* Edit button */}
                         <button className="sd-edit-btn" onClick={() => handleEdit(i, log)}>
                           Edit
                         </button>
-                        {/* View / Hide toggle */}
                         <button
                           className="sd-edit-btn"
                           style={{ marginLeft: 6 }}
-                          onClick={() =>
-                            setExpandedLog(expandedLog === log.id ? null : log.id)
-                          }
+                          onClick={() => setExpandedLog(expandedLog === log.id ? null : log.id)}
                         >
                           {expandedLog === log.id ? "Hide" : "View"}
                         </button>
-                        {/* Submit — only for Draft logs */}
                         {log.status === "Draft" && (
                           <button
                             className="sd-submit-btn"
@@ -405,7 +402,6 @@ export default function StudentDashboard() {
                             Submit
                           </button>
                         )}
-                        {/* Supervisor feedback — only for Rejected logs */}
                         {log.status === "Rejected" && log.supervisor_comment && (
                           <div className="sd-feedback" style={{ marginTop: 6 }}>
                             <strong>Feedback:</strong> {log.supervisor_comment}
@@ -413,7 +409,6 @@ export default function StudentDashboard() {
                         )}
                       </td>
                     </tr>
-                    {/* Completed the expandable detail row that was truncated */}
                     {expandedLog === log.id && (
                       <tr key={`${log.id || i}-detail`}>
                         <td colSpan={4}>
@@ -443,13 +438,15 @@ export default function StudentDashboard() {
     </>
   );
 
+  // FIX (profile tab): was reading from `user` (stale const from module scope),
+  // now reads from `currentUser` state so it reflects the fetched profile data.
   const renderProfile = () => (
     <section className="sd-info-card">
       <h2 className="sd-section-title">My Profile</h2>
       <div className="sd-info-grid">
-        <p><strong>Username:</strong> {user?.username || "Not set"}</p>
-        <p><strong>Email:</strong> {user?.email || "Not set"}</p>
-        <p><strong>Role:</strong> {user?.role || "Student"}</p>
+        <p><strong>Username:</strong> {currentUser?.username || "Not set"}</p>
+        <p><strong>Email:</strong> {currentUser?.email || "Not set"}</p>
+        <p><strong>Role:</strong> {currentUser?.role || "Student"}</p>
         <p><strong>Company:</strong> {placement?.company_name || "No placement assigned"}</p>
         <p><strong>Workplace Supervisor:</strong> {placement?.workplace_supervisor?.username || "Not assigned"}</p>
         <p><strong>Academic Supervisor:</strong> {placement?.academic_supervisor?.username || "Not assigned"}</p>
@@ -482,28 +479,24 @@ export default function StudentDashboard() {
           <span className="sd-logo-text">ILES</span>
         </div>
         <nav className="sd-nav">
-          {/* My Logs */}
           <button
             className={`sd-nav-link ${activeTab === "logs" ? "active" : ""}`}
             onClick={() => { handleTabChange("logs"); setShowForm(false); }}
           >
             My Logs
           </button>
-          {/* Profile */}
           <button
             className={`sd-nav-link ${activeTab === "profile" ? "active" : ""}`}
             onClick={() => handleTabChange("profile")}
           >
             Profile
           </button>
-          {/* Reports */}
           <button
             className={`sd-nav-link ${activeTab === "reports" ? "active" : ""}`}
             onClick={() => handleTabChange("reports")}
           >
             Reports
           </button>
-          {/* Notifications */}
           <button className="sd-nav-link" onClick={() => setShowNotifs(!showNotifs)}>
             Notifications
             {unread > 0 && <span className="notif-badge">{unread}</span>}
@@ -529,19 +522,18 @@ export default function StudentDashboard() {
       </aside>
 
       <main className="sd-main">
-        {/* FIX: Moved welcome header out of <header> wrapping tab content */}
         <header className="sd-header">
           <div>
-            <h1 className="sd-welcome">Welcome back, {user?.username || "Student"} 👋</h1>
+            {/* FIX (welcome name): now uses currentUser state, not stale const */}
+            <h1 className="sd-welcome">
+              Welcome back, {currentUser?.username || currentUser?.email?.split("@")[0] || "Student"} 👋
+            </h1>
             <p className="sd-subtitle">Internship Logging & Evaluation System</p>
           </div>
         </header>
 
         {successMsg && <div className="sd-success">{successMsg}</div>}
-        {loading && <div className="loading">Loading...</div>}
-        {error && <div className="error">{error}</div>}
 
-        {/* FIX: Tab renders moved here; duplicate log form block in <main> removed */}
         {activeTab === "logs" && (
           <>
             <div className="sd-action-bar">
@@ -603,11 +595,9 @@ export default function StudentDashboard() {
                 onClick={async () => {
                   try {
                     const updated = await updateProfile(profileForm);
-                    saveUser({
-                      ...user,
-                      username: updated.username,
-                      profile_picture: updated.profile_picture,
-                    });
+                    const merged = { ...currentUser, username: updated.username, profile_picture: updated.profile_picture };
+                    saveUser(merged);
+                    setCurrentUser(merged);
                     setProfileMsg("Profile updated!");
                     setTimeout(() => setProfileMsg(""), 3000);
                   } catch (err) {
@@ -637,9 +627,7 @@ export default function StudentDashboard() {
                     <tr>
                       <th>Status</th>
                       <td>
-                        <span
-                          className={`sd-status sd-status-${(placement.status || "pending").toLowerCase()}`}
-                        >
+                        <span className={`sd-status sd-status-${(placement.status || "pending").toLowerCase()}`}>
                           {placement.status}
                         </span>
                       </td>
