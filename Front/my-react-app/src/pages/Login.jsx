@@ -34,8 +34,15 @@ function Login() {
         return;
       }
 
-      saveToken(data.token);
-      saveUser(data.user);
+      saveToken(data.token || data.access);
+      const userToSave = data.user || {
+          id: data.id,
+          email: data.email,
+          username: data.username,
+          role: data.user?.role || data.role,
+          profile_picture: data.profile_picture || null,
+        };
+      saveUser(userToSave);
 
       const roleRoutes = {
         STUDENT: '/student',
