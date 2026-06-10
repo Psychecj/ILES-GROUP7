@@ -34,8 +34,8 @@ function Login() {
         return;
       }
 
-      saveToken(data.token);
-      saveUser(data.user);
+    saveToken(data.token);
+    saveUser({ ...data.user, profile_picture: data.user.profile_picture || null });
 
       const roleRoutes = {
         STUDENT: '/student',

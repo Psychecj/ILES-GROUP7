@@ -557,7 +557,7 @@ export default function StudentDashboard() {
                 <div className="sd-field">
                   <label className="sd-label">Current Picture</label>
                   <img
-                    src={profilePicUrl}
+                    src={profilePicUrl.startsWith('http') ? profilePicUrl : `${import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'}${profilePicUrl}`}
                     alt="Profile"
                     style={{
                       width: 80,
